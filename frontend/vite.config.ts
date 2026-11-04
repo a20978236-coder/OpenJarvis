@@ -29,7 +29,8 @@ export default defineConfig({
         short_name: 'Jarvis',
         description: 'Personal AI assistant',
         id: '/',
-        start_url: '/',
+        // Installed iPhone app opens the mobile UI; desktop stays at '/'.
+        start_url: '/m',
         scope: '/',
         theme_color: '#050b1a',
         background_color: '#050b1a',

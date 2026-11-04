@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Routes, Route } from 'react-router';
+import { Routes, Route, useLocation } from 'react-router';
 import { Layout } from './components/Layout';
 import { ChatPage } from './pages/ChatPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -17,8 +17,14 @@ import { OptInModal } from './components/OptInModal';
 import { UpdateChecker } from './components/Desktop/UpdateChecker';
 import { track, hashId } from './lib/analytics';
 import { offerAnalyticsChoice } from './lib/analytics-invitation';
+import { MobileShell } from './mobile/MobileShell';
+import { MobileHome } from './mobile/pages/MobileHome';
+import { MobileChat } from './mobile/pages/MobileChat';
+import { MobileMemory } from './mobile/pages/MobileMemory';
+import { MobileTasks } from './mobile/pages/MobileTasks';
 
 export default function App() {
+  const isMobileRoute = /^\/m(\/|$)/.test(useLocation().pathname);
   const [setupDone, setSetupDone] = useState(!isTauri());
   const handleSetupReady = useCallback(() => {
     setSetupDone(true);
@@ -183,6 +189,13 @@ export default function App() {
     <>
       <UpdateChecker />
       <Routes>
+        {/* iPhone app (installable PWA starts here) */}
+        <Route path="m" element={<MobileShell />}>
+          <Route index element={<MobileHome />} />
+          <Route path="chat" element={<MobileChat />} />
+          <Route path="memory" element={<MobileMemory />} />
+          <Route path="tasks" element={<MobileTasks />} />
+        </Route>
         <Route element={<Layout />}>
           <Route index element={<ChatPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
@@ -193,9 +206,24 @@ export default function App() {
           <Route path="logs" element={<LogsPage />} />
         </Route>
       </Routes>
-      <Toaster position="bottom-right" />
-      {commandPaletteOpen && <CommandPalette />}
-      {optInModalOpen && (
+      {isMobileRoute ? (
+        <Toaster
+          position="top-center"
+          theme="dark"
+          offset={{ top: 'calc(env(safe-area-inset-top) + 8px)' }}
+          mobileOffset={{ top: 'calc(env(safe-area-inset-top) + 8px)' }}
+          style={{
+            '--normal-bg': '#0b1b3d',
+            '--normal-text': '#e6f3ff',
+            '--normal-border': 'rgba(0, 179, 255, 0.35)',
+            '--border-radius': '14px',
+          } as React.CSSProperties}
+        />
+      ) : (
+        <Toaster position="bottom-right" />
+      )}
+      {commandPaletteOpen && !isMobileRoute && <CommandPalette />}
+      {optInModalOpen && !isMobileRoute && (
         <OptInModal onClose={() => setOptInModalOpen(false)} />
       )}
     </>

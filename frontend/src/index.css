@@ -339,6 +339,10 @@
     margin-bottom: 0.75em;
   }
 
+  /* Tailwind's preflight strips list markers; restore them for replies. */
+  .prose ul { list-style: disc; }
+  .prose ol { list-style: decimal; }
+
   .prose li {
     margin-bottom: 0.25em;
   }

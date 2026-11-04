@@ -1,0 +1,343 @@
+/*
+ * Jarvis mobile theme — dark navy + electric blue.
+ *
+ * Everything is scoped under `.jm` (the mobile shell root) so the desktop UI
+ * is untouched. The shell also redefines the app's shared --color-* tokens,
+ * so reused desktop components (MessageBubble, markdown, code blocks) pick up
+ * the navy palette without being forked.
+ */
+
+.jm {
+  /* Palette */
+  --jm-bg: #050b1a;
+  --jm-bg-2: #08142b;
+  --jm-panel: rgba(12, 28, 62, 0.62);
+  --jm-panel-strong: rgba(14, 34, 76, 0.86);
+  --jm-border: rgba(0, 179, 255, 0.18);
+  --jm-border-strong: rgba(0, 179, 255, 0.42);
+  --jm-blue: #00b3ff;
+  --jm-blue-2: #3d7bff;
+  --jm-cyan: #5ce1ff;
+  --jm-glow: rgba(0, 179, 255, 0.45);
+  --jm-text: #e6f3ff;
+  --jm-text-2: #9db4d6;
+  --jm-text-3: #7891b8;
+  --jm-danger: #ff6b81;
+  --jm-ok: #3ddc97;
+  --jm-tabbar-h: 64px;
+
+  /* Shared app tokens, re-pointed at the navy palette. */
+  --color-bg: var(--jm-bg);
+  --color-bg-secondary: var(--jm-bg-2);
+  --color-bg-tertiary: #0e1f40;
+  --color-surface: var(--jm-panel-strong);
+  --color-border: var(--jm-border);
+  --color-border-subtle: rgba(0, 179, 255, 0.08);
+  --color-text: var(--jm-text);
+  --color-text-secondary: var(--jm-text-2);
+  --color-text-tertiary: var(--jm-text-3);
+  --color-accent: var(--jm-blue);
+  --color-accent-hover: var(--jm-cyan);
+  --color-accent-subtle: rgba(0, 179, 255, 0.12);
+  --color-accent-glow: var(--jm-glow);
+  --color-code-bg: #040a18;
+  --color-input-bg: rgba(8, 22, 50, 0.9);
+  --color-input-border: var(--jm-border);
+  --color-user-bubble: linear-gradient(135deg, rgba(0, 179, 255, 0.22), rgba(61, 123, 255, 0.22));
+  --color-user-bubble-text: var(--jm-text);
+  --color-on-accent: #021024;
+  --color-error: var(--jm-danger);
+  --color-success: var(--jm-ok);
+  color-scheme: dark;
+
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--jm-text);
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(0, 120, 255, 0.28), transparent 60%),
+    radial-gradient(80% 50% at 50% 110%, rgba(0, 179, 255, 0.12), transparent 70%),
+    var(--jm-bg);
+  /* Body padding from index.css handles the root; the shell draws edge to
+     edge and pads its own header and tab bar instead. */
+  padding: 0;
+  font-family: 'Geist Variable', system-ui, -apple-system, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Fine HUD grid behind everything. */
+.jm::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0, 179, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 179, 255, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at 50% 30%, black 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 30%, black 20%, transparent 75%);
+}
+
+.jm input,
+.jm textarea,
+.jm [data-selectable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.jm :focus-visible {
+  outline: 2px solid var(--jm-cyan);
+  outline-offset: 2px;
+}
+
+/* ---- Structure -------------------------------------------------------- */
+
+.jm-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  padding-left: calc(env(safe-area-inset-left) + 16px);
+  padding-right: calc(env(safe-area-inset-right) + 16px);
+}
+
+.jm-wordmark {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  color: var(--jm-text);
+  text-shadow: 0 0 18px var(--jm-glow);
+}
+
+.jm-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--jm-text-3);
+  flex-shrink: 0;
+}
+.jm-status-dot[data-state='online'] {
+  background: var(--jm-ok);
+  box-shadow: 0 0 10px rgba(61, 220, 151, 0.8);
+}
+.jm-status-dot[data-state='offline'] {
+  background: var(--jm-danger);
+  box-shadow: 0 0 10px rgba(255, 107, 129, 0.7);
+}
+
+.jm-main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.jm-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 4px 16px 20px;
+}
+
+.jm-tabbar {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: calc(var(--jm-tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  background: rgba(5, 11, 26, 0.82);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-top: 1px solid var(--jm-border);
+}
+
+.jm-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--jm-text-3);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.2s;
+}
+.jm-tab[aria-current='page'] {
+  color: var(--jm-cyan);
+}
+.jm-tab[aria-current='page'] svg {
+  filter: drop-shadow(0 0 6px var(--jm-glow));
+}
+
+/* ---- Building blocks -------------------------------------------------- */
+
+.jm-panel {
+  background: var(--jm-panel);
+  border: 1px solid var(--jm-border);
+  border-radius: 18px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px -18px rgba(0, 120, 255, 0.6);
+}
+
+.jm-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--jm-text-3);
+}
+
+.jm-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid var(--jm-border);
+  background: rgba(8, 22, 50, 0.6);
+  color: var(--jm-text-2);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.jm-icon-btn[aria-pressed='true'] {
+  color: var(--jm-cyan);
+  border-color: var(--jm-border-strong);
+  background: rgba(0, 179, 255, 0.12);
+}
+.jm-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.jm-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 14px;
+  border: none;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--color-on-accent);
+  background: linear-gradient(135deg, var(--jm-cyan), var(--jm-blue) 50%, var(--jm-blue-2));
+  box-shadow: 0 6px 22px -8px var(--jm-glow);
+  cursor: pointer;
+}
+.jm-primary-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.jm-field {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--jm-border);
+  background: var(--color-input-bg);
+  color: var(--jm-text);
+  font-size: 16px;
+  outline: none;
+}
+.jm-field::placeholder {
+  color: var(--jm-text-3);
+}
+.jm-field:focus {
+  border-color: var(--jm-border-strong);
+  box-shadow: 0 0 0 3px rgba(0, 179, 255, 0.15);
+}
+
+/* Composer pinned above the tab bar. */
+.jm-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--jm-border);
+  background: rgba(5, 11, 26, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.jm-composer textarea {
+  flex: 1;
+  resize: none;
+  max-height: 140px;
+  line-height: 1.4;
+}
+
+/* Chat messages: reuse MessageBubble, tighten it for a phone. */
+.jm-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px 16px;
+}
+.jm-chat-list pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ---- Orb -------------------------------------------------------------- */
+
+.jm-orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: none;
+  padding: 0;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.jm-orb canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.jm-orb-caption {
+  margin-top: 14px;
+  min-height: 20px;
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--jm-text-2);
+}
+
+/* Keyframes for small inline indicators (orb itself is canvas-driven). */
+@keyframes jm-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.jm-pulse {
+  animation: jm-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jm-pulse {
+    animation: none;
+  }
+}

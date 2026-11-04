@@ -112,7 +112,7 @@ describe('sendChatMessage', () => {
     stopChatStream();
     await pending;
 
-    const last = useAppStore.getState().messages.at(-1);
+    const last = useAppStore.getState().messages.slice(-1)[0];
     expect(last?.content).toBe('Partial');
     expect(useAppStore.getState().streamState.isStreaming).toBe(false);
   });
@@ -125,6 +125,6 @@ describe('sendChatMessage', () => {
     });
 
     await sendChatMessage('hello');
-    expect(useAppStore.getState().messages.at(-1)?.content).toBe('Error: HTTP 500');
+    expect(useAppStore.getState().messages.slice(-1)[0]?.content).toBe('Error: HTTP 500');
   });
 });
