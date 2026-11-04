@@ -24,6 +24,8 @@ interface MobileContextValue {
   speechAvailable: boolean;
   /** Tap-to-talk: start recording, or stop and send what was heard. */
   toggleTalk: () => Promise<void>;
+  /** Start recording for dictation into a field (see `dictate`). */
+  listen: () => Promise<void>;
   /** Stop a recording and return the transcript without sending it. */
   dictate: () => Promise<string | null>;
 }
@@ -111,6 +113,12 @@ export function MobileShell() {
     }
   }, [speech]);
 
+  const listen = useCallback(async () => {
+    if (speech.state !== 'idle') return;
+    useTtsStore.getState().stop();
+    await speech.startRecording();
+  }, [speech]);
+
   const toggleTalk = useCallback(async () => {
     if (speech.state === 'transcribing') return;
     if (speech.state === 'recording') {
@@ -143,9 +151,10 @@ export function MobileShell() {
       speechState: speech.state,
       speechAvailable: speech.available,
       toggleTalk,
+      listen,
       dictate,
     }),
-    [online, orbState, speech.state, speech.available, toggleTalk, dictate],
+    [online, orbState, speech.state, speech.available, toggleTalk, listen, dictate],
   );
 
   const toggleVoiceOut = () => {

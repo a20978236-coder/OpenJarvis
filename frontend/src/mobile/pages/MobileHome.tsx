@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Brain, Cpu, MessageCircle, Sparkles } from 'lucide-react';
+import { Brain, CheckSquare, ChevronRight, Cpu, MessageCircle, Sparkles } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getMemoryStats } from '../../lib/api';
+import { getPersonalSummary, type PersonalSummary } from '../../lib/personal-api';
 import { useChatSender } from '../../hooks/useChatSender';
 import { JarvisOrb } from '../JarvisOrb';
 import { useMobile } from '../MobileShell';
@@ -30,12 +31,16 @@ export function MobileHome() {
   const modelsLoading = useAppStore((s) => s.modelsLoading);
   const conversations = useAppStore((s) => s.conversations);
   const [memoryCount, setMemoryCount] = useState<number | null>(null);
+  const [summary, setSummary] = useState<PersonalSummary | null>(null);
 
   useEffect(() => {
     if (!online) return;
     getMemoryStats()
       .then((s) => setMemoryCount(s.entries))
       .catch(() => setMemoryCount(null));
+    getPersonalSummary()
+      .then(setSummary)
+      .catch(() => setSummary(null));
   }, [online]);
 
   const ask = async (prompt: string) => {
@@ -69,6 +74,26 @@ export function MobileHome() {
         </p>
       )}
 
+      <button
+        type="button"
+        className="jm-panel"
+        onClick={() => navigate('/m/tasks')}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+      >
+        <CheckSquare size={22} style={{ color: 'var(--jm-cyan)', flexShrink: 0 }} aria-hidden="true" />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="jm-label">Today</div>
+          <div style={{ marginTop: 4, fontSize: 14, fontWeight: 500 }}>
+            {summary === null
+              ? 'Tasks & notes'
+              : summary.open_tasks === 0
+                ? 'No open tasks'
+                : `${summary.due_today} due · ${summary.open_tasks} open`}
+          </div>
+        </div>
+        <ChevronRight size={18} style={{ color: 'var(--jm-text-3)' }} aria-hidden="true" />
+      </button>
+
       <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div className="jm-panel" style={{ padding: '12px 14px', minWidth: 0 }}>
           <div className="jm-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -95,6 +120,7 @@ export function MobileHome() {
           </div>
         </button>
       </section>
+
 
       <section>
         <div className="jm-label" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
