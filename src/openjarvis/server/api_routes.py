@@ -1309,6 +1309,12 @@ def include_all_routes(app) -> None:
     app.include_router(feedback_router)
     app.include_router(optimize_router)
 
+    from openjarvis.server.personal_routes import (  # noqa: PLC0415
+        personal_router,
+    )
+
+    app.include_router(personal_router)
+
     # Agent Manager routes (if available)
     try:
         if hasattr(app.state, "agent_manager") and app.state.agent_manager:
