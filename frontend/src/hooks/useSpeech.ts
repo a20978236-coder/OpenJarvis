@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { transcribeAudio, fetchSpeechHealth } from '../lib/api';
+import { pickRecordingMimeType, recordingFilename } from '../lib/audio-format';
 
 export type SpeechState = 'idle' | 'recording' | 'transcribing';
 
@@ -30,7 +31,10 @@ export function useSpeech() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      const recorder = new MediaRecorder(stream);
+      // Ask for an explicit container so the upload can be named after it;
+      // iPhone Safari only records MP4, Chrome/Firefox prefer WebM.
+      const mimeType = pickRecordingMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
@@ -61,11 +65,14 @@ export function useSpeech() {
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
 
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        // Prefer the recorder's reported type, then the chunks' own type;
+        // only fall back to WebM when the browser reports neither.
+        const recordedType = recorder.mimeType || chunksRef.current[0]?.type || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: recordedType });
         chunksRef.current = [];
 
         try {
-          const result = await transcribeAudio(blob);
+          const result = await transcribeAudio(blob, recordingFilename(recordedType));
           setState('idle');
           resolve(result.text);
         } catch (err) {

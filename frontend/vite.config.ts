@@ -27,17 +27,26 @@ export default defineConfig({
       manifest: {
         name: 'OpenJarvis',
         short_name: 'Jarvis',
-        description: 'On-device AI assistant',
-        theme_color: '#161618',
-        background_color: '#161618',
+        description: 'Personal AI assistant',
+        id: '/',
+        start_url: '/',
+        scope: '/',
+        theme_color: '#050b1a',
+        background_color: '#050b1a',
         display: 'standalone',
+        orientation: 'portrait',
         icons: [
+          { src: 'apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Offline: serve the cached app shell for page navigations so the
+        // installed app still opens without a connection (API calls are
+        // excluded below and fail visibly instead of returning HTML).
+        navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/v1\//, /^\/health/, /^\/dashboard/, /^\/api\//],
       },
     }),

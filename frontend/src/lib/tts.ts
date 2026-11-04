@@ -36,6 +36,65 @@ let controller: AbortController | null = null;
 let token = 0;
 let healthProbe: Promise<void> | null = null;
 
+/**
+ * iOS Safari only lets an audio element play if it was first started from a
+ * user gesture. Replies are spoken after a network round trip -- long after
+ * the tap -- so a fresh `new Audio()` there is silently blocked. Instead, the
+ * first tap plays a few milliseconds of silence on one element, and every
+ * later utterance reuses that already-unlocked element.
+ */
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAACA'
+  + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg'
+  + 'ICAgICAgICAgICAgICAgICAgICAgA==';
+let unlockedEl: HTMLAudioElement | null = null;
+let unlockInstalled = false;
+let removeUnlockListeners: (() => void) | null = null;
+
+/** Prime one audio element for playback; must run inside a user gesture. */
+export function unlockAudioPlayback(): void {
+  if (unlockedEl || typeof Audio === 'undefined') return;
+  try {
+    const el = new Audio(SILENT_WAV);
+    const played = el.play();
+    const markUnlocked = () => {
+      el.pause();
+      unlockedEl = el;
+      removeUnlockListeners?.();
+      removeUnlockListeners = null;
+    };
+    if (played && typeof played.then === 'function') {
+      played.then(markUnlocked).catch(() => {
+        // Gesture did not qualify; the next one will try again.
+      });
+    } else {
+      markUnlocked();
+    }
+  } catch {
+    // Audio unavailable; playback falls back to a fresh element per reply.
+  }
+}
+
+/** Unlock audio on the first tap/click/key press anywhere in the app. */
+export function installAudioUnlock(target: Pick<Document, 'addEventListener' | 'removeEventListener'> = document): void {
+  if (unlockInstalled) return;
+  unlockInstalled = true;
+  const events = ['touchend', 'pointerup', 'keydown'] as const;
+  // Listeners stay until an unlock actually succeeds, then remove themselves.
+  const handler = () => unlockAudioPlayback();
+  events.forEach((e) => target.addEventListener(e, handler, true));
+  removeUnlockListeners = () => events.forEach((e) => target.removeEventListener(e, handler, true));
+}
+
+/** Element for the next utterance: the unlocked one when available. */
+function playbackElement(url: string): HTMLAudioElement {
+  if (unlockedEl) {
+    unlockedEl.src = url;
+    return unlockedEl;
+  }
+  return new Audio(url);
+}
+
 /** Only a stream ending in the active conversation may trigger autoplay. */
 export function shouldAutoplayFinishedReply(
   previousStreamingConversationId: string | null,
@@ -118,7 +177,7 @@ export const useTtsStore = create<TtsStore>((set, get) => ({
 
       const url = URL.createObjectURL(blob);
       objectUrl = url;
-      const el = new Audio(url);
+      const el = playbackElement(url);
       audio = el;
 
       el.onended = () => {
@@ -159,6 +218,10 @@ export function __resetTtsForTests(): void {
   teardown();
   token = 0;
   healthProbe = null;
+  unlockedEl = null;
+  unlockInstalled = false;
+  removeUnlockListeners?.();
+  removeUnlockListeners = null;
   useTtsStore.setState({
     state: 'idle',
     speakingId: null,
