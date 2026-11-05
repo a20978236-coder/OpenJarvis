@@ -41,7 +41,9 @@ export async function listMemoryDocuments(
 ): Promise<{ documents: MemoryDocument[]; total: number }> {
   const res = await apiFetch(`/v1/memory/documents?limit=${limit}&offset=${offset}`);
   if (!res.ok) return fail(res, 'Could not load memory');
-  return res.json();
+  const body = await res.json();
+  if (!Array.isArray(body?.documents)) throw new Error('Unexpected reply from the server while loading memory');
+  return { documents: body.documents, total: Number.isFinite(body.total) ? body.total : body.documents.length };
 }
 
 export async function deleteMemoryDocument(id: string): Promise<void> {
@@ -52,7 +54,9 @@ export async function deleteMemoryDocument(id: string): Promise<void> {
 export async function listLearnedFacts(): Promise<{ enabled: boolean; facts: LearnedFact[] }> {
   const res = await apiFetch('/v1/memory/facts');
   if (!res.ok) return fail(res, 'Could not load learned facts');
-  return res.json();
+  const body = await res.json();
+  if (!Array.isArray(body?.facts)) throw new Error('Unexpected reply from the server while loading learned facts');
+  return { enabled: body.enabled !== false, facts: body.facts };
 }
 
 /** Forget a fact; the text guards against deleting a different one. */

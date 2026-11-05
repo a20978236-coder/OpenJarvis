@@ -122,3 +122,13 @@ describe('task grouping and due labels', () => {
     expect(localISODate(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
   });
 });
+
+describe('malformed server replies', () => {
+  it('turns a missing list into an error instead of crashing the screen', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const { listTasks, listNotes } = await import('./personal-api');
+    await expect(listTasks()).rejects.toThrow('Unexpected reply');
+    fetchMock.mockResolvedValue(new Response('{"notes":"nope"}', { status: 200 }));
+    await expect(listNotes()).rejects.toThrow('Unexpected reply');
+  });
+});

@@ -78,3 +78,13 @@ describe('memory management client', () => {
     expect(filterByText(items, '  ', (s) => s)).toEqual(items);
   });
 });
+
+describe('malformed server replies', () => {
+  it('rejects instead of returning undefined lists', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    const { listMemoryDocuments, listLearnedFacts } = await import('./memory-api');
+    await expect(listMemoryDocuments()).rejects.toThrow('Unexpected reply');
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    await expect(listLearnedFacts()).rejects.toThrow('Unexpected reply');
+  });
+});

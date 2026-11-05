@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { Brain, CheckSquare, Home, MessageCircle, Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '../lib/store';
@@ -24,6 +24,8 @@ import { HellOrb } from './HellOrb';
  */
 interface MobileContextValue {
   online: boolean | null;
+  /** Round-trip time of the last health check, in ms. */
+  serverLatencyMs: number | null;
   orbState: OrbState;
   speechState: SpeechState;
   speechAvailable: boolean;
@@ -66,7 +68,7 @@ function applyMobileDefaultsOnce(update: (s: { speechEnabled: boolean; voiceOutp
 }
 
 const TABS = [
-  { to: '/m', label: 'Home', icon: Home, end: true },
+  { to: '/m', label: 'HELL', icon: Home, end: true },
   { to: '/m/chat', label: 'Chat', icon: MessageCircle, end: false },
   { to: '/m/memory', label: 'Memory', icon: Brain, end: false },
   { to: '/m/tasks', label: 'Tasks', icon: CheckSquare, end: false },
@@ -138,7 +140,10 @@ export function MobileShell() {
 
 function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; signOut: () => Promise<void> }) {
   const navigate = useNavigate();
+  // The dashboard is a full-screen hub with its own top bar and dock.
+  const onDashboard = /^\/m\/?$/.test(useLocation().pathname);
   const [online, setOnline] = useState<boolean | null>(null);
+  const [serverLatencyMs, setLatency] = useState<number | null>(null);
   const updateSettings = useAppStore((s) => s.updateSettings);
   const voiceOut = useAppStore((s) => s.settings.voiceOutputEnabled && s.settings.voiceAutoplay);
   const isStreaming = useAppStore((s) => s.streamState.isStreaming);
@@ -165,7 +170,18 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
   }, []);
 
   useEffect(() => {
-    const check = () => checkHealth().then(setOnline).catch(() => setOnline(false));
+    const check = () => {
+      const t0 = performance.now();
+      checkHealth()
+        .then((ok) => {
+          setOnline(ok);
+          setLatency(ok ? Math.round(performance.now() - t0) : null);
+        })
+        .catch(() => {
+          setOnline(false);
+          setLatency(null);
+        });
+    };
     check();
     const interval = setInterval(check, 20000);
     const onVisible = () => {
@@ -245,6 +261,7 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
   const value = useMemo<MobileContextValue>(
     () => ({
       online,
+      serverLatencyMs,
       orbState,
       speechState: speech.state,
       speechAvailable: speech.available,
@@ -257,7 +274,7 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
       authVia,
       signOut,
     }),
-    [online, orbState, speech.state, speech.available, toggleTalk, listen, dictate, activate, flashError, openOrbSettings, authVia, signOut],
+    [online, serverLatencyMs, orbState, speech.state, speech.available, toggleTalk, listen, dictate, activate, flashError, openOrbSettings, authVia, signOut],
   );
 
   const toggleVoiceOut = () => {
@@ -268,7 +285,8 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
 
   return (
     <MobileContext.Provider value={value}>
-      <div className="jm">
+      <div className="jm" data-dashboard={onDashboard || undefined}>
+        {!onDashboard && (
         <header className="jm-header">
           <span
             className="jm-status-dot"
@@ -289,11 +307,13 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
             {voiceOut ? <Volume2 size={20} /> : <VolumeX size={20} />}
           </button>
         </header>
+        )}
 
         <main className="jm-main">
           <Outlet />
         </main>
 
+        {!onDashboard && (
         <nav className="jm-tabbar" aria-label="Main">
           {TABS.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} className="jm-tab">
@@ -302,6 +322,7 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
             </NavLink>
           ))}
         </nav>
+        )}
         {orbSettingsOpen && <OrbCustomizer onClose={() => setOrbSettingsOpen(false)} />}
       </div>
     </MobileContext.Provider>

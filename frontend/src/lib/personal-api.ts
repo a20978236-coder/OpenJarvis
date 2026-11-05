@@ -63,11 +63,18 @@ const json = (method: string, body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+/** Server data is untrusted: a malformed list must surface as an error, not crash a screen. */
+function listOf<T>(body: unknown, key: string, what: string): T[] {
+  const v = (body as Record<string, unknown> | null)?.[key];
+  if (!Array.isArray(v)) throw new Error(`Unexpected reply from the server while loading ${what}`);
+  return v as T[];
+}
+
 // ---- Tasks -------------------------------------------------------------
 
 export async function listTasks(status: 'open' | 'done' | 'all' = 'open'): Promise<Task[]> {
-  const data = await call<{ tasks: Task[] }>(`/tasks?status=${status}`, {}, 'Could not load tasks');
-  return data.tasks;
+  const data = await call<unknown>(`/tasks?status=${status}`, {}, 'Could not load tasks');
+  return listOf<Task>(data, 'tasks', 'tasks');
 }
 
 export function createTask(input: { title: string; notes?: string; due?: string | null; priority?: Priority }): Promise<Task> {
@@ -89,8 +96,8 @@ export function deleteTask(id: string): Promise<void> {
 
 export async function listNotes(query = ''): Promise<Note[]> {
   const qs = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
-  const data = await call<{ notes: Note[] }>(`/notes${qs}`, {}, 'Could not load notes');
-  return data.notes;
+  const data = await call<unknown>(`/notes${qs}`, {}, 'Could not load notes');
+  return listOf<Note>(data, 'notes', 'notes');
 }
 
 export function createNote(input: { title?: string; body?: string; pinned?: boolean }): Promise<Note> {

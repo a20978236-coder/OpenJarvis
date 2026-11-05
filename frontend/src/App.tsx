@@ -18,7 +18,10 @@ import { UpdateChecker } from './components/Desktop/UpdateChecker';
 import { track, hashId } from './lib/analytics';
 import { offerAnalyticsChoice } from './lib/analytics-invitation';
 import { MobileShell } from './mobile/MobileShell';
-import { MobileHome } from './mobile/pages/MobileHome';
+import { HoloDashboard } from './mobile/dashboard/HoloDashboard';
+import { ModuleScreen } from './mobile/pages/ModuleScreen';
+import { MobileSettings } from './mobile/pages/MobileSettings';
+import { AiModules } from './mobile/pages/AiModules';
 import { MobileChat } from './mobile/pages/MobileChat';
 import { MobileMemory } from './mobile/pages/MobileMemory';
 import { MobileTasks } from './mobile/pages/MobileTasks';
@@ -191,10 +194,13 @@ export default function App() {
       <Routes>
         {/* iPhone app (installable PWA starts here) */}
         <Route path="m" element={<MobileShell />}>
-          <Route index element={<MobileHome />} />
+          <Route index element={<HoloDashboard />} />
           <Route path="chat" element={<MobileChat />} />
           <Route path="memory" element={<MobileMemory />} />
           <Route path="tasks" element={<MobileTasks />} />
+          <Route path="settings" element={<MobileSettings />} />
+          <Route path="ai" element={<AiModules />} />
+          <Route path="module/:id" element={<ModuleScreen />} />
         </Route>
         <Route element={<Layout />}>
           <Route index element={<ChatPage />} />
