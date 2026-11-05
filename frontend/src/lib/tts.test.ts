@@ -270,7 +270,7 @@ describe('iOS audio unlock', () => {
     // blob:, never data: -- the server's CSP (media-src 'self' blob:) blocks
     // data: URLs, which would silently defeat the unlock on a real deploy.
     expect(primed.src).toBe('blob:fake/1');
-    expect(revoked).toContain('blob:fake/1'); // silent clip released once primed
+    expect(revoked).not.toContain('blob:fake/1'); // silent clip kept: the element may still read it
 
     synth.mockResolvedValue(new Blob(['x']));
     await useTtsStore.getState().speak('m1', 'Hello there');

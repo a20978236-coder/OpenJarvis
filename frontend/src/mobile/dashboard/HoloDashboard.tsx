@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Boxes, Camera, Keyboard, Mic, Send, Square, Volume2, VolumeX, X } from 'lucide-react';
+import { Boxes, Camera, ChevronUp, Keyboard, Mic, Send, Square, Volume2, VolumeX, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { useTtsStore } from '../../lib/tts';
 import { getPersonalSummary } from '../../lib/personal-api';
@@ -10,6 +10,7 @@ import { HellWordmark } from '../HellWordmark';
 import { useMobile } from '../MobileShell';
 import { MODULES, type HellModule } from './modules';
 import { fitOrb } from './layout';
+import { useGestures } from '../gestures/gesture-settings';
 import { WeatherCard, WeatherSheet } from './WeatherCard';
 import './dashboard.css';
 
@@ -140,6 +141,7 @@ export function HoloDashboard() {
   const selectedModel = useAppStore((s) => s.selectedModel);
   const voiceOut = useAppStore((s) => s.settings.voiceOutputEnabled && s.settings.voiceAutoplay);
   const updateSettings = useAppStore((s) => s.updateSettings);
+  const minimized = useGestures((s) => s.dashView === 'minimized');
 
   useEffect(() => {
     if (!online) return;
@@ -149,7 +151,7 @@ export function HoloDashboard() {
   }, [online]);
 
   const colW = Math.max(106, Math.min(132, Math.round(stage.w * 0.31)));
-  const orbSize = fitOrb(stage.w, stage.h, colW);
+  const orbSize = fitOrb(stage.w, stage.h, minimized ? 40 : colW);
   // Spread the six buttons per side over the stage height (as in the
   // design) on tall screens; compact on short ones.
   const btnH = Math.max(44, Math.min(62, Math.floor((stage.h * 0.9 - 5 * 10) / 6)));
@@ -187,7 +189,7 @@ export function HoloDashboard() {
     online === null ? 'Connecting' : online ? (serverLatencyMs != null ? `${serverLatencyMs} ms` : 'Online') : 'Offline';
 
   return (
-    <div className="hd">
+    <div className="hd" data-view={minimized ? 'minimized' : undefined}>
       <div className="hd-circuit" aria-hidden="true" />
 
       {/* -- Top: clock · HELL · status ------------------------------------ */}
@@ -250,6 +252,12 @@ export function HoloDashboard() {
           ))}
         </nav>
       </div>
+
+      {minimized && (
+        <button type="button" className="hd-restore jm-primary-btn" onClick={() => useGestures.getState().setDashView('full')} aria-label="Restore the dashboard">
+          <ChevronUp size={20} aria-hidden="true" /> Show HELL
+        </button>
+      )}
 
       {/* -- Listening status ---------------------------------------------- */}
       <div className="hd-listen hd-chamfer" role="status" aria-live="polite">

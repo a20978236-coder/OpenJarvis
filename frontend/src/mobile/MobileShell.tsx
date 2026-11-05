@@ -18,6 +18,10 @@ import { OrbCustomizer } from './OrbCustomizer';
 import { isBuilderCommand } from './hologram/holo-commands';
 import { useCamera } from './vision/camera';
 import { HellOrb } from './HellOrb';
+import { useHolo } from './hologram/holo-store';
+import type { GestureName } from './gestures/gesture-recognizer';
+import { ACTION_LABELS, GESTURE_LABELS, stepCarousel, useGestures } from './gestures/gesture-settings';
+import { useTouchGestures, type GestureContext } from './gestures/useTouchGestures';
 
 /**
  * One voice pipeline for the whole mobile app: the orb on Home and the mic in
@@ -143,7 +147,8 @@ export function MobileShell() {
 function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; signOut: () => Promise<void> }) {
   const navigate = useNavigate();
   // The dashboard and the Hologram Builder are full-screen with their own controls.
-  const onDashboard = /^\/m\/?$|^\/m\/(hologram|vision)\/?$/.test(useLocation().pathname);
+  const location = useLocation();
+  const onDashboard = /^\/m\/?$|^\/m\/(hologram|vision)\/?$/.test(location.pathname);
   const [online, setOnline] = useState<boolean | null>(null);
   const [serverLatencyMs, setLatency] = useState<number | null>(null);
   const updateSettings = useAppStore((s) => s.updateSettings);
@@ -269,6 +274,93 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
   const base: OrbState = visionBusy && derived !== 'listening' ? 'vision' : derived;
   const orbState: OrbState = transient && base !== 'listening' ? transient : base;
 
+  // ---- Touchscreen gestures (Stage E) -----------------------------------
+  const shellRef = useRef<HTMLDivElement>(null);
+  const holoMode = useHolo((s) => s.mode);
+  const path = location.pathname.replace(/\/+$/, '') || '/m';
+  const gestureCtx: GestureContext = orbSettingsOpen
+    ? 'off'
+    : path === '/m'
+      ? 'dashboard'
+      : path === '/m/hologram'
+        ? holoMode === 'fullscreen'
+          ? 'fullscreen'
+          : 'page' // the 3D canvas itself is excluded (it owns drag/pinch)
+        : 'page';
+  const [hud, setHud] = useState<{ text: string; key: number } | null>(null);
+  const hudTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (hudTimer.current) clearTimeout(hudTimer.current);
+  }, []);
+  const showHud = useCallback((text: string) => {
+    if (hudTimer.current) clearTimeout(hudTimer.current);
+    setHud({ text, key: Date.now() });
+    hudTimer.current = setTimeout(() => setHud(null), 1400);
+  }, []);
+
+  /** Run what `g` is assigned to here; returns a label, or null if it doesn't apply. */
+  const runGesture = (g: GestureName): string | null => {
+    const gs = useGestures.getState();
+    const action = gs.map[g];
+    const dash = gestureCtx === 'dashboard';
+    switch (action) {
+      case 'open-hell':
+        if (!dash) return null;
+        if (gs.dashView === 'minimized') {
+          gs.setDashView('full');
+          return 'HELL restored';
+        }
+        navigate('/m/chat');
+        return ACTION_LABELS[action];
+      case 'minimize':
+        if (!dash || gs.dashView === 'minimized') return null;
+        gs.setDashView('minimized');
+        return 'Minimized';
+      case 'prev-module':
+      case 'next-module': {
+        if (!dash && gestureCtx !== 'page') return null;
+        const to = stepCarousel(location.pathname, location.search, action === 'next-module' ? 1 : -1);
+        if (!to) return null;
+        navigate(to.route);
+        return to.label;
+      }
+      case 'listen':
+        if (!dash) return null;
+        if (!speech.available || online === false) {
+          flashError();
+          return 'Voice is unavailable';
+        }
+        void toggleTalk();
+        return speech.state === 'recording' ? 'Sending' : 'Listening';
+      case 'open-settings':
+        if (!dash) return null;
+        navigate('/m/settings');
+        return ACTION_LABELS[action];
+      case 'expand-holo':
+        if (!dash) return null;
+        navigate('/m/hologram', { state: { present: true } });
+        return ACTION_LABELS[action];
+      case 'collapse-holo':
+        if (gestureCtx === 'fullscreen') {
+          useHolo.getState().setMode('edit');
+          if ((location.state as { present?: boolean } | null)?.present) navigate('/m');
+          return ACTION_LABELS[action];
+        }
+        if (dash && gs.dashView === 'full') {
+          gs.setDashView('minimized');
+          return 'Minimized';
+        }
+        return null;
+      default:
+        return null;
+    }
+  };
+  useTouchGestures(shellRef, gestureCtx, (g) => {
+    const label = runGesture(g);
+    if (label && useGestures.getState().feedback) showHud(`${GESTURE_LABELS[g]} · ${label}`);
+    return label !== null;
+  });
+
   const value = useMemo<MobileContextValue>(
     () => ({
       online,
@@ -296,7 +388,7 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
 
   return (
     <MobileContext.Provider value={value}>
-      <div className="jm" data-dashboard={onDashboard || undefined}>
+      <div className="jm" ref={shellRef} data-dashboard={onDashboard || undefined} data-gestures={gestureCtx}>
         {!onDashboard && (
         <header className="jm-header">
           <span
@@ -335,6 +427,9 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
         </nav>
         )}
         {orbSettingsOpen && <OrbCustomizer onClose={() => setOrbSettingsOpen(false)} />}
+        <div className="jm-gesture-hud" role="status" aria-live="polite">
+          {hud && <span key={hud.key}>{hud.text}</span>}
+        </div>
       </div>
     </MobileContext.Provider>
   );

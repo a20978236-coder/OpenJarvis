@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Group, Plane, Vector3 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { useHolo } from './holo-store';
+import { useGestures } from '../gestures/gesture-settings';
 import { snapValue } from './holo-ops';
 import type { HoloObject, HoloScene as SceneSettings, Vec3 } from './holo-types';
 import { FOOTPRINT, HoloVisual, fpsMeter } from './HoloObjects';
@@ -37,6 +38,13 @@ function Controls() {
       controlsRef.current = null;
     };
   }, [camera, gl]);
+  // In full-screen presentation a pinch in closes it (touch gestures), so
+  // it must not also zoom the camera.
+  const mode = useHolo((s) => s.mode);
+  const gestures = useGestures((s) => s.enabled);
+  useEffect(() => {
+    if (controlsRef.current) controlsRef.current.enableZoom = !(mode === 'fullscreen' && gestures);
+  }, [mode, gestures, camera, gl]);
   useFrame(() => controlsRef.current?.update());
   return null;
 }

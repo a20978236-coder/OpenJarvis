@@ -468,6 +468,11 @@ export function HologramBuilder() {
   const incoming = (location.state as { command?: string } | null)?.command;
   const [pendingCommand, setPendingCommand] = useState<string | undefined>(incoming);
   const [sheet, setSheet] = useState<SheetKind>(incoming ? 'ask' : null);
+  // "Pinch out" on the dashboard presents the hologram full-screen.
+  const present = (location.state as { present?: boolean } | null)?.present === true;
+  useEffect(() => {
+    if (present) useHolo.getState().setMode('fullscreen');
+  }, [present]);
   // Camera off when leaving the builder (privacy + battery).
   useEffect(() => () => useCamera.getState().stop(), []);
   const hasCameraDisplay = layout.objects.some((o) => o.type === 'camera');

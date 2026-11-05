@@ -421,3 +421,24 @@
   .hd-module { font-size: 11px; gap: 5px; padding: 6px 8px; }
   .hd-module-icon { width: 18px; height: 18px; }
 }
+
+/* ---- Touchscreen gestures (Stage E) ------------------------------------- */
+/* The dashboard doesn't scroll; the app handles swipes and pinches here
+   (page pinch-zoom would otherwise fight "pinch out = expand"). */
+.hd {
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+.hd[data-view='minimized'] .hd-col,
+.hd[data-view='minimized'] .hd-dock,
+.hd[data-view='minimized'] .hd-compose {
+  display: none;
+}
+.hd-restore {
+  z-index: 2;
+  align-self: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 20px;
+  margin-bottom: 6px;
+}

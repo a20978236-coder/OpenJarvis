@@ -450,3 +450,40 @@
   cursor: pointer;
 }
 .holo-chip:disabled { opacity: 0.5; }
+
+/* ---- Touchscreen gestures (Stage E) ------------------------------------- */
+/* Module screens keep vertical scrolling and pinch-zoom; horizontal finger
+   movement reaches the app as left/right swipes. */
+.jm[data-gestures='page'] .jm-main,
+.jm[data-gestures='page'] .jm-scroll,
+.jm[data-gestures='page'] .vis-panel {
+  touch-action: pan-y pinch-zoom;
+}
+.jm-gesture-hud {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.jm-gesture-hud > span {
+  display: block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--jm-border-strong);
+  background: rgba(5, 14, 32, 0.92);
+  color: var(--jm-cyan);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 0 18px -6px var(--jm-glow);
+  animation: jm-hud-in 0.18s ease-out;
+}
+@keyframes jm-hud-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jm-gesture-hud > span { animation: none; }
+}

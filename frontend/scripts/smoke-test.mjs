@@ -279,6 +279,27 @@ console.log(`HELL smoke test — ${base}\n`);
     expect((await page.locator('video').evaluate((v) => v.srcObject)) === null, 'stream not released');
   });
 
+  await check('Touch gestures: swipe right = next module, swipe down = minimize, button restores', async () => {
+    const cdp = await ctx.newCDPSession(page);
+    const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], i) => ({ x, y, id: i + 1 })) });
+    const swipe = async (x0, y0, x1, y1) => {
+      await touch('touchStart', [[x0, y0]]);
+      for (let i = 1; i <= 4; i++) await touch('touchMove', [[x0 + ((x1 - x0) * i) / 4, y0 + ((y1 - y0) * i) / 4]]);
+      await touch('touchEnd', []);
+      await page.waitForTimeout(300);
+    };
+    await page.goto(`${base}/m`, { waitUntil: 'networkidle' });
+    await page.getByRole('navigation', { name: 'Modules, left' }).waitFor();
+    await swipe(60, 330, 300, 330);
+    await page.waitForURL('**/m/hologram', { timeout: 5000 });
+    await page.goto(`${base}/m`, { waitUntil: 'networkidle' });
+    await page.getByRole('navigation', { name: 'Modules, left' }).waitFor();
+    await swipe(195, 250, 195, 520);
+    await page.getByRole('button', { name: 'Restore the dashboard' }).click({ timeout: 5000 });
+    await page.getByRole('navigation', { name: 'Modules, left' }).waitFor({ timeout: 5000 });
+    await cdp.detach();
+  });
+
   await check('Desktop app at / still renders', async () => {
     const desk = await ctx.newPage();
     await desk.setViewportSize({ width: 1280, height: 800 });

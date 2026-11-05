@@ -74,14 +74,18 @@ export function unlockAudioPlayback(): void {
     const played = el.play();
     const markUnlocked = () => {
       el.pause();
-      release();
+      // Keep the (~120 byte) silent clip's URL: the element may still read
+      // from it, and revoking it here logged ERR_FILE_NOT_FOUND.
+      url = null;
       unlockedEl = el;
       removeUnlockListeners?.();
       removeUnlockListeners = null;
     };
     if (played && typeof played.then === 'function') {
       played.then(markUnlocked).catch(() => {
-        // Gesture did not qualify; the next one will try again.
+        // Gesture did not qualify; the next one will try again. Detach the
+        // clip first so the element stops reading the URL we revoke.
+        el.removeAttribute?.('src');
         release();
       });
     } else {
