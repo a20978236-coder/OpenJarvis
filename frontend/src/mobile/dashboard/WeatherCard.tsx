@@ -49,8 +49,22 @@ export function WeatherCard({ online, onOpenSetup }: { online: boolean | null; o
     setError(null);
     if (source.kind === 'off' || online === false) return;
     void load();
-    const t = setInterval(() => void load(), REFRESH_MS);
-    return () => clearInterval(t);
+    // Battery: refresh only while visible; catch up when HELL comes back.
+    let last = Date.now();
+    const refresh = () => {
+      if (document.hidden) return;
+      last = Date.now();
+      void load();
+    };
+    const t = setInterval(refresh, REFRESH_MS);
+    const onVisible = () => {
+      if (!document.hidden && Date.now() - last > REFRESH_MS) refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [load, source.kind, online]);
 
   let body;

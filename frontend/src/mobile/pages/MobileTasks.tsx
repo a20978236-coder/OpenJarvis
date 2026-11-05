@@ -545,7 +545,7 @@ export function MobileTasks() {
             aria-selected={view === v}
             onClick={() => setParams(v === 'notes' ? { view: 'notes' } : {}, { replace: true })}
             style={{
-              minHeight: 40,
+              minHeight: 44,
               borderRadius: 10,
               border: 'none',
               fontSize: 15,

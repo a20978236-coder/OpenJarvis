@@ -138,6 +138,11 @@ function fakeServer(state) {
 // Checks
 // --------------------------------------------------------------------------
 
+const waitDraftCount = (page, n) =>
+  page
+    .waitForFunction((k) => (JSON.parse(localStorage.getItem('hell-holo-draft-v1') || '{}').layout?.objects?.length ?? 0) === k, n, { timeout: 5000 })
+    .catch(() => {});
+
 const results = [];
 async function check(name, fn) {
   const t0 = Date.now();
@@ -251,7 +256,12 @@ console.log(`HELL smoke test — ${base}\n`);
     await page.getByRole('button', { name: 'Undo' }).click();
   });
 
-  const draft = () => page.evaluate(() => JSON.parse(localStorage.getItem('hell-holo-draft-v1') || 'null'));
+  // pagehide flushes any pending (debounced) draft first, so reads are never stale.
+  const draft = () =>
+    page.evaluate(() => {
+      window.dispatchEvent(new Event('pagehide'));
+      return JSON.parse(localStorage.getItem('hell-holo-draft-v1') || 'null');
+    });
   // No draft yet on a fresh device means the starter layout: the HELL orb alone.
   const count = async () => (await draft())?.layout?.objects?.length ?? 1;
 
@@ -261,9 +271,11 @@ console.log(`HELL smoke test — ${base}\n`);
     await page.getByLabel('What should HELL build?').fill('build me a 3D rotating planet');
     await page.getByRole('button', { name: 'Run command' }).click();
     await page.getByText('Built-in command').first().waitFor();
-    await page.waitForTimeout(600);
+    // The draft is saved shortly after a change; wait for it rather than a fixed time.
+    await page.waitForFunction((n) => (JSON.parse(localStorage.getItem('hell-holo-draft-v1') || '{}').layout?.objects?.length ?? 0) === n, before + 1, { timeout: 5000 }).catch(() => {});
     const d = await draft();
-    expect(d.layout.objects.length === before + 1, `expected ${before + 1} objects, got ${d.layout.objects.length}`);
+    const log = await page.locator('.holo-log').innerText().catch(() => '');
+    expect(d.layout.objects.length === before + 1, `expected ${before + 1} objects, got ${d.layout.objects.length}: ${JSON.stringify(d.layout.objects.map((o) => o.type + '/' + o.variant))} | log: ${log.slice(0, 200).replace(/\n/g, ' / ')}`);
     expect(d.layout.objects.at(-1).variant === 'planet', 'last object is not a planet');
   });
 
@@ -272,7 +284,7 @@ console.log(`HELL smoke test — ${base}\n`);
     await page.getByLabel('What should HELL build?').fill('conjure something shiny and precious');
     await page.getByRole('button', { name: 'Run command' }).click();
     await page.getByText('Added a golden crystal.').waitFor({ timeout: 8000 });
-    await page.waitForTimeout(600);
+    await waitDraftCount(page, before + 1);
     const d = await draft();
     expect(d.layout.objects.length === before + 1, 'AI result was not applied');
     expect(d.layout.objects.at(-1).variant === 'crystal', 'AI object type wrong');
@@ -282,7 +294,7 @@ console.log(`HELL smoke test — ${base}\n`);
     const before = await count();
     await page.getByRole('button', { name: 'Close Ask HELL' }).click();
     await page.getByRole('button', { name: 'Undo' }).click();
-    await page.waitForTimeout(600);
+    await waitDraftCount(page, before - 1);
     expect((await count()) === before - 1, 'undo did not revert the AI change');
   });
 
@@ -428,8 +440,13 @@ console.log(`HELL smoke test — ${base}\n`);
     const desk = await ctx.newPage();
     await desk.setViewportSize({ width: 1280, height: 800 });
     await desk.route('**/*', fakeServer(freshState()));
+    const deskErrors = [];
+    desk.on('pageerror', (e) => deskErrors.push(e.message));
     await desk.goto(`${base}/`, { waitUntil: 'networkidle' });
-    await desk.locator('textarea').first().waitFor({ timeout: 10000 });
+    await desk.locator('textarea').first().waitFor({ timeout: 15000 }).catch(async () => {
+      const body = (await desk.locator('body').innerText().catch(() => '')).slice(0, 200).replace(/\n/g, ' / ');
+      throw new Error(`desktop did not render: url=${desk.url()} body="${body}" errors=${JSON.stringify(deskErrors)}`);
+    });
     await desk.close();
   });
 

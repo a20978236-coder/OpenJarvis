@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { handAssetsPlugin } from './scripts/hand-assets.mjs';
+import { compressAssetsPlugin } from './scripts/compress-assets.mjs';
 
 // VITE_SUPABASE_ANON_KEY is intentionally NOT required here: a missing key
 // disables the savings leaderboard at runtime (see src/lib/supabase.ts) rather
@@ -24,6 +25,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     handAssetsPlugin(),
+    compressAssetsPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
@@ -72,6 +74,10 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         codeSplitting: {
+          // Only the named packages go into each group; shared helpers they
+          // depend on stay where they are used, so the iPhone dashboard does
+          // not pull in the desktop charts just for a tiny shared utility.
+          includeDependenciesRecursively: false,
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom)[\\/]/ },
             {

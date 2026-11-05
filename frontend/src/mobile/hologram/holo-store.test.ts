@@ -119,3 +119,17 @@ describe('hologram editor history', () => {
     expect(s.layout.name).toBe('Loaded');
   });
 });
+
+describe('draft flush on leaving the app', () => {
+  it('writes a debounced draft immediately when flushed', async () => {
+    vi.useFakeTimers();
+    const { useHolo, flushDraft } = await import('./holo-store');
+    useHolo.getState().apply({ op: 'add', type: 'clock' });
+    const before = JSON.parse(localStorage.getItem('hell-holo-draft-v1') || 'null');
+    const count = useHolo.getState().layout.objects.length;
+    expect(before?.layout?.objects?.length ?? 0).not.toBe(count); // still pending
+    flushDraft();
+    expect(JSON.parse(localStorage.getItem('hell-holo-draft-v1') || '{}').layout.objects.length).toBe(count);
+    vi.useRealTimers();
+  });
+});

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { Brain, CheckSquare, Home, MessageCircle, Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
@@ -211,7 +211,10 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
         });
     };
     check();
-    const interval = setInterval(check, 20000);
+    // Battery: no polling while HELL is in the background (checked on return).
+    const interval = setInterval(() => {
+      if (!document.hidden) check();
+    }, 20000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') check();
     };
@@ -591,7 +594,10 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
         )}
 
         <main className="jm-main">
-          <Outlet />
+          {/* Screens load on demand; the shell (voice, hands, wake phrase) never unmounts. */}
+          <Suspense fallback={<div className="route-loading" role="status">Loading…</div>}>
+            <Outlet />
+          </Suspense>
         </main>
 
         {!onDashboard && (

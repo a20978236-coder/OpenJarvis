@@ -224,7 +224,7 @@ export function VisionScreen() {
             <Send size={18} />
           </button>
         </form>
-        <label className="holo-toggle" style={{ minHeight: 36, fontSize: 14 }}>
+        <label className="holo-toggle" style={{ fontSize: 14 }}>
           <input type="checkbox" className="hell-switch" checked={compare} disabled={!shots.length} onChange={(e) => setCompare(e.target.checked)} />
           <GitCompare size={16} aria-hidden="true" /> Compare with the previous photo
         </label>

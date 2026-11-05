@@ -41,11 +41,39 @@ function writeDraft(d: Draft) {
   }
 }
 /** Debounced for rapid edits; `now` for open/new/save, which must not be lost. */
+let pendingDraft: Draft | null = null;
 function saveDraft(d: Draft, now = false) {
   if (draftTimer) clearTimeout(draftTimer);
   draftTimer = null;
+  pendingDraft = null;
   if (now) writeDraft(d);
-  else draftTimer = setTimeout(() => writeDraft(d), 400);
+  else {
+    pendingDraft = d;
+    draftTimer = setTimeout(() => {
+      draftTimer = null;
+      pendingDraft = null;
+      writeDraft(d);
+    }, 400);
+  }
+}
+
+/** Write a pending (debounced) draft right away. */
+export function flushDraft(): void {
+  if (!pendingDraft) return;
+  if (draftTimer) clearTimeout(draftTimer);
+  draftTimer = null;
+  const d = pendingDraft;
+  pendingDraft = null;
+  writeDraft(d);
+}
+
+// Leaving the app (home swipe, lock, tab close) must not lose the last edit:
+// iOS may freeze the page before a debounce timer fires.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushDraft);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) flushDraft();
+  });
 }
 
 export interface HoloState {

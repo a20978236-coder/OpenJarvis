@@ -532,3 +532,17 @@ html[data-anim='off'] *::after {
   transition: none !important;
   scroll-behavior: auto !important;
 }
+
+.route-loading { display: grid; place-items: center; min-height: 40vh; font-size: 14px; color: var(--jm-text-3); }
+
+/* ---- Touch targets (Stage J): 44 pt minimum everywhere ------------------- */
+.ges-back { height: 44px; min-height: 44px; }
+.cal-knob input[type='range'] { min-height: 44px; }
+.holo-chip { min-height: 44px; }
+.holo-toggle { min-height: 44px; }
+.jm-field[type='date'] { min-height: 44px; }
+/* Dashboard status chips: small to look at, ~44 pt to tap. Voice grows upward
+   (over the non-interactive Net line), Hands downward, so they never overlap. */
+.hd-chip-btn { position: relative; }
+.hd-chip-btn::after { content: ''; position: absolute; left: -10px; right: -6px; top: -20px; bottom: -1px; }
+.hd-chip-btn + .hd-chip-btn::after { top: -2px; bottom: -20px; }

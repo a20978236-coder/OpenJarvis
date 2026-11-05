@@ -129,7 +129,7 @@
 .cal-knob { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
 .cal-knob-top { display: flex; justify-content: space-between; gap: 8px; font-size: 14.5px; font-weight: 600; }
 .cal-knob output { font-weight: 500; color: var(--jm-cyan); font-variant-numeric: tabular-nums; }
-.cal-knob input[type='range'] { width: 100%; min-height: 32px; accent-color: var(--jm-blue); }
+.cal-knob input[type='range'] { width: 100%; min-height: 44px; accent-color: var(--jm-blue); }
 .cal-knob small { font-size: 12.5px; color: var(--jm-text-3); }
 .cal-assign { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14.5px; }
 .cal-assign > span { flex: none; font-weight: 600; }

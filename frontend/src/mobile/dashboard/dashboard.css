@@ -402,7 +402,7 @@
 @media (max-height: 700px) {
   .hd { gap: 5px; }
   .hd-time { font-size: 22px; }
-  .hd-module { min-height: 40px; font-size: 11.5px; }
+  .hd-module { min-height: 44px; font-size: 11.5px; }
   .hd-col { gap: 5px; }
   .hd-listen { min-height: 40px; }
   .hd-dock { min-height: 72px; }

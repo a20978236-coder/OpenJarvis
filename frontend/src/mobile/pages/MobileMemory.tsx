@@ -595,7 +595,7 @@ export function MobileMemory() {
             aria-selected={view === v}
             onClick={() => setParams(v === 'learned' ? {} : { view: v }, { replace: true })}
             style={{
-              minHeight: 40,
+              minHeight: 44,
               borderRadius: 10,
               border: 'none',
               fontSize: 14,
