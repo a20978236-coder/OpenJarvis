@@ -1,3 +1,4 @@
+import { motionOff } from '../lib/ui-prefs';
 import { useEffect, useRef } from 'react';
 
 import type { OrbState } from './orb-types';
@@ -214,9 +215,7 @@ export function drawOrb(
 }
 
 function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined'
-    && typeof window.matchMedia === 'function'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return motionOff();
 }
 
 interface CanvasOrbProps {

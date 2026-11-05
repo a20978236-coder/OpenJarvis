@@ -126,7 +126,7 @@ export function VoiceSettings() {
             <span>Speaking speed</span>
             <output>{prefs.rate.toFixed(2)}×</output>
           </span>
-          <input type="range" min={RATE_LIMITS[0]} max={RATE_LIMITS[1]} step={0.05} value={prefs.rate} onChange={(e) => prefs.update({ rate: Number(e.target.value) })} />
+          <input type="range" aria-label="Speaking speed" aria-valuetext={`${prefs.rate.toFixed(2)} times`} min={RATE_LIMITS[0]} max={RATE_LIMITS[1]} step={0.05} value={prefs.rate} onChange={(e) => prefs.update({ rate: Number(e.target.value) })} />
         </label>
         <button type="button" className="jm-primary-btn" onClick={preview} disabled={!serverOk && !deviceVoices}>
           {previewing ? <Square size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />} {previewing ? 'Stop' : 'Preview voice'}

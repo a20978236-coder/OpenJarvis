@@ -213,7 +213,7 @@ console.log(`HELL smoke test — ${base}\n`);
       ['/m/memory', () => page.getByText('Likes espresso')],
       ['/m/tasks', () => page.getByLabel('New task')],
       ['/m/tasks?view=notes', () => page.getByLabel('Search notes')],
-      ['/m/settings', () => page.getByText('Orb appearance')],
+      ['/m/settings', () => page.getByRole('slider', { name: 'Interface brightness' })],
       ['/m/ai', () => page.getByRole('radio', { name: 'smoke-model' })],
     ];
     for (const [path, find] of screens) {
@@ -410,6 +410,18 @@ console.log(`HELL smoke test — ${base}\n`);
     await page.getByLabel(/Shortcut name/).fill('Lights Off');
     await page.getByRole('button', { name: 'Add button' }).click();
     await page.getByRole('button', { name: 'Run shortcut Lights Off' }).waitFor({ timeout: 5000 });
+  });
+
+  await check('Settings: brightness dims HELL, animation can be turned off, sliders are named', async () => {
+    await page.goto(`${base}/m/settings`, { waitUntil: 'networkidle' });
+    await page.getByRole('slider', { name: 'Interface brightness' }).fill('0.6');
+    const dim = await page.locator('.jm-dimmer').evaluate((e) => getComputedStyle(e).opacity);
+    expect(dim === '0.4', `dimmer opacity ${dim}`);
+    await page.getByRole('radio', { name: 'Off' }).click();
+    expect((await page.evaluate(() => document.documentElement.dataset.anim)) === 'off', 'animation not off');
+    await page.getByRole('button', { name: /Reset appearance/ }).click();
+    const unnamed = await page.locator('input[type=range]:not([aria-label]):not([id])').count();
+    expect(unnamed === 0, `${unnamed} unnamed slider(s)`);
   });
 
   await check('Desktop app at / still renders', async () => {

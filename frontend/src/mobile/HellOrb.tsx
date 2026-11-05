@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { CanvasOrb } from './CanvasOrb';
 import { ORB_CAPTIONS, type OrbState } from './orb-types';
 import { useOrbPrefs } from './orb-prefs';
+import { motionOff, useUiPrefs } from '../lib/ui-prefs';
 import { createPressRecognizer, type PressHandlers } from './press-recognizer';
 import type { OrbEngine } from './particle-orb-engine';
 
@@ -22,7 +23,7 @@ interface HellOrbProps extends PressHandlers {
 }
 
 function prefersReducedMotion(): boolean {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return motionOff();
 }
 
 /**
@@ -46,6 +47,7 @@ export function HellOrb({
   onLongPress,
 }: HellOrbProps) {
   const prefs = useOrbPrefs();
+  const animation = useUiPrefs((s) => s.animation);
   const hintId = useId();
   const px = Math.round(size * prefs.scale);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -90,7 +92,7 @@ export function HellOrb({
       engineRef.current = null;
     };
     // Size changes are applied without a rebuild below.
-  }, [showBase]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showBase, animation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => engineRef.current?.setState(state), [state, mode]);
   useEffect(() => engineRef.current?.setLevel(level), [level, mode]);
@@ -111,8 +113,10 @@ export function HellOrb({
   useEffect(() => engineRef.current?.setSize(px), [px, mode]);
   useEffect(() => {
     const { palette, density, scale, speed, glow, reducedEffects } = prefs;
-    engineRef.current?.setPrefs({ palette, density, scale, speed, glow, reducedEffects });
-  }, [prefs, mode]);
+    // "Calm" animation: slower orb with fewer effects.
+    const calm = animation === 'calm';
+    engineRef.current?.setPrefs({ palette, density, scale, speed: calm ? speed * 0.55 : speed, glow, reducedEffects: reducedEffects || calm });
+  }, [prefs, mode, animation]);
 
   // Pause when hidden or off-screen (battery).
   useEffect(() => {

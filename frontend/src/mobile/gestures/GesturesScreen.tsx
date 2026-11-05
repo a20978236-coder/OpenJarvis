@@ -140,7 +140,7 @@ export function GesturesScreen() {
             <span>Hold time</span>
             <output>{(hands.holdMs / 1000).toFixed(1)} s</output>
           </span>
-          <input type="range" min={HAND_LIMITS.holdMs[0]} max={HAND_LIMITS.holdMs[1]} step={100} value={hands.holdMs} onChange={(e) => useHands.getState().updateSettings({ holdMs: Number(e.target.value) })} />
+          <input type="range" aria-label="Hold time" aria-valuetext={`${(hands.holdMs / 1000).toFixed(1)} seconds`} min={HAND_LIMITS.holdMs[0]} max={HAND_LIMITS.holdMs[1]} step={100} value={hands.holdMs} onChange={(e) => useHands.getState().updateSettings({ holdMs: Number(e.target.value) })} />
           <small>How long to hold a sign before HELL acts. Longer means fewer accidents.</small>
         </label>
         <label className="cal-knob">
@@ -148,7 +148,7 @@ export function GesturesScreen() {
             <span>Recognition confidence</span>
             <output>{Math.round(hands.minScore * 100)}%</output>
           </span>
-          <input type="range" min={HAND_LIMITS.minScore[0]} max={HAND_LIMITS.minScore[1]} step={0.05} value={hands.minScore} onChange={(e) => useHands.getState().updateSettings({ minScore: Number(Number(e.target.value).toFixed(2)) })} />
+          <input type="range" aria-label="Recognition confidence" aria-valuetext={`${Math.round(hands.minScore * 100)}%`} min={HAND_LIMITS.minScore[0]} max={HAND_LIMITS.minScore[1]} step={0.05} value={hands.minScore} onChange={(e) => useHands.getState().updateSettings({ minScore: Number(Number(e.target.value).toFixed(2)) })} />
           <small>Higher ignores unclear signs; lower reacts in poor light.</small>
         </label>
         <button

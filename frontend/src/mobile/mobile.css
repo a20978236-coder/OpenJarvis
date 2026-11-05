@@ -18,7 +18,8 @@
   --jm-blue: #00b3ff;
   --jm-blue-2: #3d7bff;
   --jm-cyan: #5ce1ff;
-  --jm-glow: rgba(0, 179, 255, 0.45);
+  /* Interface glow follows Settings › Appearance (0–1.6×). */
+  --jm-glow: rgba(0, 179, 255, calc(0.45 * var(--hell-glow, 1)));
   --jm-text: #e6f3ff;
   --jm-text-2: #9db4d6;
   --jm-text-3: #7891b8;
@@ -506,3 +507,28 @@
 .mem-danger { flex: 1 1 150px; width: auto; min-height: 44px; gap: 6px; color: #ff8fa0; border-color: rgba(255, 107, 129, 0.4); }
 .mem-danger[data-armed] { background: var(--jm-danger); color: #fff; border-color: transparent; }
 .holo-chip[aria-pressed='true'] { border-color: var(--jm-cyan); color: var(--jm-cyan); background: rgba(0, 179, 255, 0.18); }
+
+/* ---- Appearance (Settings) ------------------------------------------------- */
+/* Interface brightness: a dimming layer that never blocks touches. */
+.jm-dimmer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  opacity: var(--hell-dim, 0);
+  pointer-events: none;
+}
+/* Animation intensity: "calm" lets each looping animation play once and stop;
+   "off" removes animation and transitions entirely. */
+html[data-anim='calm'] *,
+html[data-anim='calm'] *::before,
+html[data-anim='calm'] *::after {
+  animation-iteration-count: 1 !important;
+}
+html[data-anim='off'] *,
+html[data-anim='off'] *::before,
+html[data-anim='off'] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}

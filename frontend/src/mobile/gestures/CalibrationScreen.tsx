@@ -164,6 +164,8 @@ export function CalibrationScreen() {
               </span>
               <input
                 type="range"
+                aria-label={k.label}
+                aria-valuetext={k.show(v)}
                 min={lo}
                 max={hi}
                 step={k.step}

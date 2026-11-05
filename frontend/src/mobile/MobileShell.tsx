@@ -14,6 +14,7 @@ import { createVad } from '../lib/vad';
 import { startWakeListener } from '../lib/device-speech';
 import { useVoicePrefs } from '../lib/voice-prefs';
 import { installErrorLog } from '../lib/error-log';
+import { useUiPrefs } from '../lib/ui-prefs';
 import { matchShortcutCommand, runShortcut, useShortcuts } from './apps/shortcuts';
 import { useChatSender } from '../hooks/useChatSender';
 import { useAutoSpeakReplies } from '../hooks/useAutoSpeakReplies';
@@ -183,6 +184,8 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
     applyMobileDefaultsOnce(updateSettings);
   }, [updateSettings]);
   useEffect(() => installErrorLog(), []);
+  // Load (and apply) interface brightness / glow / animation on start.
+  useUiPrefs((s) => s.animation);
 
   // Match the iOS status bar to the navy shell while it is mounted.
   useEffect(() => {
@@ -602,6 +605,7 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
         </nav>
         )}
         {orbSettingsOpen && <OrbCustomizer onClose={() => setOrbSettingsOpen(false)} />}
+        <div className="jm-dimmer" aria-hidden="true" />
         <div className="jm-gesture-hud" role="status" aria-live="polite">
           {hud && <span key={hud.key}>{hud.text}</span>}
         </div>
