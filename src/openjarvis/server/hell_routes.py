@@ -165,3 +165,52 @@ async def weather(
     }
     _cache_put(wkey, result)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Vision status (camera screen)
+# ---------------------------------------------------------------------------
+
+
+@hell_router.get("/vision")
+async def vision_status(request: Request, model: str = Query("", max_length=200)):
+    """Can the selected model see camera frames? Which installed models can?"""
+    import asyncio
+
+    from openjarvis.server.vision import (
+        VISION_MODEL_HINT,
+        engine_accepts_images,
+        model_sees_images,
+    )
+
+    engine = getattr(request.app.state, "engine", None)
+    if engine is None:
+        return {
+            "model": model,
+            "engine_accepts": False,
+            "model_sees": False,
+            "vision_models": [],
+            "hint": VISION_MODEL_HINT,
+        }
+
+    def probe() -> Dict[str, Any]:
+        try:
+            names = list(engine.list_models())[:25]
+        except Exception:
+            names = []
+        capable = [
+            m
+            for m in names
+            if engine_accepts_images(engine, m) and model_sees_images(engine, m)
+        ]
+        accepts = engine_accepts_images(engine, model) if model else False
+        sees = model_sees_images(engine, model) if model and accepts else False
+        return {
+            "model": model,
+            "engine_accepts": accepts,
+            "model_sees": sees,
+            "vision_models": capable,
+            "hint": VISION_MODEL_HINT,
+        }
+
+    return await asyncio.to_thread(probe)

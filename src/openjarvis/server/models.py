@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # ---------------------------------------------------------------------------
 # Request models
@@ -15,10 +15,26 @@ from pydantic import BaseModel, Field
 
 class ChatMessage(BaseModel):
     role: str
-    content: str = ""
+    # A string, or OpenAI-style parts (text + inline images). Normalised to
+    # text in ``content`` and base64 images in ``images`` (see vision.py).
+    content: Union[str, List[Dict[str, Any]], None] = ""
     name: Optional[str] = None
     tool_calls: Optional[List[Dict[str, Any]]] = None
     tool_call_id: Optional[str] = None
+    images: Optional[List[str]] = None
+
+    @model_validator(mode="after")
+    def _split_images(self) -> "ChatMessage":
+        from openjarvis.server.vision import check_images, split_content
+
+        text, images = split_content(self.content)
+        extra = check_images(self.images) or []
+        self.content = text
+        merged = images + extra
+        if len(merged) > 4:
+            raise ValueError("at most 4 images per message")
+        self.images = merged or None
+        return self
 
 
 class ChatCompletionRequest(BaseModel):
