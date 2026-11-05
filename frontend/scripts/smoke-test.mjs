@@ -1,0 +1,315 @@
+#!/usr/bin/env node
+/**
+ * HELL build tester — smoke-tests the PRODUCTION build in a headless iPhone 12.
+ *
+ *   npm run build && npm run test:smoke      (or: npm run test:build)
+ *
+ * Serves the built app with `vite preview` and fakes the OpenJarvis server
+ * API in the browser, so no backend or AI model is needed (works in CI).
+ * Every check is independent; the script prints PASS/FAIL per check and
+ * exits non-zero if anything failed or the page threw an error.
+ *
+ * Env: SMOKE_BROWSER=/path/to/chromium  (optional executable override)
+ *      SMOKE_HEADED=1                     (watch it run)
+ */
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { preview } from 'vite';
+import { chromium, devices } from 'playwright';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(here, '..');
+const outDir = path.resolve(root, '../src/openjarvis/server/static');
+if (!existsSync(path.join(outDir, 'index.html'))) {
+  console.error(`No build found at ${outDir}. Run "npm run build" first.`);
+  process.exit(2);
+}
+
+// --------------------------------------------------------------------------
+// Fake server API
+// --------------------------------------------------------------------------
+
+const json = (body, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
+const sse = (text) => ({
+  status: 200,
+  contentType: 'text/event-stream',
+  body: `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } })}\n\n`,
+});
+
+function fakeServer(state) {
+  return async (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const p = url.pathname;
+    const method = req.method();
+    if (p === '/health') return route.fulfill(json({ status: 'ok' }));
+    if (p === '/v1/auth/session') {
+      if (state.authRequired && method === 'POST') {
+        const ok = req.postDataJSON()?.passcode === 'correct horse';
+        if (ok) state.authRequired = false;
+        return route.fulfill(ok ? json({ auth_required: true, authenticated: true }) : json({ detail: 'Wrong passcode' }, 401));
+      }
+      return route.fulfill(json({ auth_required: state.authRequired, authenticated: !state.authRequired, via: state.authRequired ? null : 'cookie' }));
+    }
+    if (state.authRequired && p.startsWith('/v1/')) return route.fulfill(json({ detail: 'Missing Authorization header' }, 401));
+    if (p === '/v1/models') return route.fulfill(json({ data: [{ id: 'smoke-model', owned_by: 'ollama' }] }));
+    if (p === '/v1/info') return route.fulfill(json({ model: 'smoke-model', agent: null, engine: 'ollama' }));
+    if (p === '/v1/speech/health') return route.fulfill(json({ available: state.speech }));
+    if (p === '/v1/speech/transcribe') return route.fulfill(json({ text: state.heard, language: 'en', confidence: 1, duration_seconds: 1 }));
+    if (p === '/v1/speech/tts/health') return route.fulfill(json({ available: false }));
+    if (p === '/v1/memory/stats') return route.fulfill(json({ entries: 3, backend: 'sqlite' }));
+    if (p === '/v1/memory/facts') return route.fulfill(json({ enabled: true, facts: [{ index: 0, text: 'Likes espresso', source: 'auto', created_at: 1, trust: 'auto', recallable: true }] }));
+    if (p === '/v1/memory/documents') return route.fulfill(json({ documents: [], total: 0 }));
+    if (p === '/v1/personal/summary') return route.fulfill(json({ open_tasks: 1, due_today: 1, notes: 0 }));
+    if (p === '/v1/personal/tasks') {
+      if (method === 'POST') {
+        const t = { id: `t${state.tasks.length}`, title: req.postDataJSON().title, notes: '', due: null, priority: 0, done: false, created_at: 0, updated_at: 0, completed_at: null };
+        state.tasks.push(t);
+        return route.fulfill(json(t, 201));
+      }
+      return route.fulfill(json({ tasks: state.tasks }));
+    }
+    if (p === '/v1/personal/notes') return route.fulfill(json({ notes: [] }));
+    if (p === '/v1/personal/holograms') {
+      if (method === 'POST') {
+        state.saved = { id: 'h1', ...req.postDataJSON() };
+        return route.fulfill(json({ id: 'h1', name: state.saved.name, objects: state.saved.data.objects.length, data: state.saved.data }, 201));
+      }
+      return route.fulfill(json({ holograms: state.saved ? [{ id: 'h1', name: state.saved.name, objects: state.saved.data.objects.length, created_at: 0, updated_at: 0 }] : [] }));
+    }
+    if (p === '/v1/agents') return route.fulfill(json({ registered: ['simple'], running: [] }));
+    if (p === '/v1/skills') return route.fulfill(json({ skills: [] }));
+    if (p === '/v1/chat/completions') {
+      const body = req.postDataJSON();
+      if (body.stream === false) {
+        // Hologram AI fallback: answer with editor operations.
+        state.aiCalls++;
+        return route.fulfill(json({ choices: [{ message: { content: '<think>plan</think>{"ops":[{"op":"add","type":"rotating","props":{"variant":"crystal","color":"gold"}}],"reply":"Added a golden crystal."}' } }] }));
+      }
+      return route.fulfill(sse('Systems online.'));
+    }
+    if (p.startsWith('/v1/') || p.startsWith('/api/')) return route.fulfill(json({}));
+    return route.continue();
+  };
+}
+
+// --------------------------------------------------------------------------
+// Checks
+// --------------------------------------------------------------------------
+
+const results = [];
+async function check(name, fn) {
+  const t0 = Date.now();
+  try {
+    await fn();
+    results.push({ name, ok: true, ms: Date.now() - t0 });
+    console.log(`  PASS  ${name}`);
+  } catch (e) {
+    results.push({ name, ok: false, ms: Date.now() - t0, error: e });
+    console.log(`  FAIL  ${name}\n        ${String(e?.message ?? e).split('\n')[0]}`);
+  }
+}
+function expect(cond, msg) {
+  if (!cond) throw new Error(msg);
+}
+
+const server = await preview({ root, logLevel: 'silent', preview: { port: 0, strictPort: false, host: '127.0.0.1' } });
+const base = server.resolvedUrls.local[0].replace(/\/$/, '');
+const browser = await chromium.launch({
+  headless: !process.env.SMOKE_HEADED,
+  executablePath: process.env.SMOKE_BROWSER || undefined,
+  args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+});
+
+// iPhone 12 home-screen app: 844pt minus the notch (47) and home-indicator (34) insets.
+const IPHONE_12_APP = { ...devices['iPhone 12'], viewport: { width: 390, height: 763 } };
+
+async function newPage(state, opts = IPHONE_12_APP) {
+  const ctx = await browser.newContext(opts);
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => {
+    // The upstream KaTeX font is blocked by the production CSP; harmless.
+    if (m.type() === 'error' && !/Failed to load resource|KaTeX|data:font/.test(m.text())) errors.push(m.text());
+  });
+  await page.route('**/*', fakeServer(state));
+  return { ctx, page, errors };
+}
+const freshState = () => ({ authRequired: false, tasks: [], saved: null, aiCalls: 0, speech: false, heard: '' });
+
+console.log(`HELL smoke test — ${base}\n`);
+
+{
+  const { ctx, page, errors } = await newPage(freshState());
+
+  await check('Dashboard renders HELL with all 12 modules and the orb', async () => {
+    await page.goto(`${base}/m`, { waitUntil: 'networkidle' });
+    await page.locator('.hd').waitFor();
+    expect((await page.locator('.hell-wordmark').first().getAttribute('aria-label')) === 'HELL Phase 6', 'wordmark missing');
+    expect((await page.locator('.hd-module').count()) === 12, 'expected 12 module buttons');
+    await page.waitForFunction(() => ['3d', 'fallback'].includes(document.querySelector('.hell-orb')?.getAttribute('data-mode') ?? ''), null, { timeout: 15000 });
+    expect(!(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)), 'page scrolls sideways');
+  });
+
+  await check('No "Jarvis" branding on the dashboard', async () => {
+    const text = await page.evaluate(() => document.body.innerText);
+    expect(!/jarvis/i.test(text), 'found "Jarvis" in visible text');
+  });
+
+  await check('Chat streams a reply', async () => {
+    await page.locator('.hd-dock').getByRole('button', { name: 'Type a message' }).click();
+    await page.keyboard.type('Status report');
+    await page.keyboard.press('Enter');
+    await page.waitForURL('**/m/chat');
+    await page.getByText('Systems online.').waitFor({ timeout: 10000 });
+  });
+
+  await check('Memory, Tasks, Notes, Settings and AI Modules open', async () => {
+    const screens = [
+      ['/m/memory', () => page.getByText('Likes espresso')],
+      ['/m/tasks', () => page.getByLabel('New task')],
+      ['/m/tasks?view=notes', () => page.getByLabel('Search notes')],
+      ['/m/settings', () => page.getByText('Orb appearance')],
+      ['/m/ai', () => page.getByRole('radio', { name: 'smoke-model' })],
+    ];
+    for (const [path, find] of screens) {
+      await page.goto(`${base}${path}`, { waitUntil: 'networkidle' });
+      await find().first().waitFor({ timeout: 8000 }).catch(() => {
+        throw new Error(`${path} did not render its main control`);
+      });
+    }
+  });
+
+  await check('Adding a task works', async () => {
+    await page.goto(`${base}/m/tasks`, { waitUntil: 'networkidle' });
+    await page.getByLabel('New task').fill('Smoke-test task');
+    await page.getByRole('button', { name: 'Add task' }).click();
+    await page.getByText('Smoke-test task', { exact: true }).waitFor();
+  });
+
+  await check('Hologram Builder opens with a 3D workspace', async () => {
+    await page.goto(`${base}/m/hologram`, { waitUntil: 'networkidle' });
+    await page.locator('.holo-canvas canvas').waitFor({ timeout: 15000 });
+  });
+
+  await check('Builder toolbar fits the iPhone 12 with an object selected (44pt targets)', async () => {
+    await page.getByRole('button', { name: 'Add object' }).click();
+    await page.getByRole('button', { name: /^Digital clock/ }).click();
+    const r = await page.evaluate(() => {
+      const bar = document.querySelector('.holo-toolbar').getBoundingClientRect();
+      return [...document.querySelectorAll('.holo-tool')].map((e) => {
+        const b = e.getBoundingClientRect();
+        return { label: e.getAttribute('aria-label'), ok: b.width >= 44 && b.height >= 44 && b.right <= bar.right + 1 && b.left >= bar.left - 1 };
+      });
+    });
+    const bad = r.filter((x) => !x.ok).map((x) => x.label);
+    expect(bad.length === 0, `cut off or too small: ${bad.join(', ')}`);
+    await page.getByRole('button', { name: 'Undo' }).click();
+  });
+
+  const draft = () => page.evaluate(() => JSON.parse(localStorage.getItem('hell-holo-draft-v1') || 'null'));
+  // No draft yet on a fresh device means the starter layout: the HELL orb alone.
+  const count = async () => (await draft())?.layout?.objects?.length ?? 1;
+
+  await check('Voice/text building: "build me a 3D rotating planet" creates it (built-in)', async () => {
+    const before = await count();
+    await page.getByRole('button', { name: 'Ask HELL to build' }).click();
+    await page.getByLabel('What should HELL build?').fill('build me a 3D rotating planet');
+    await page.getByRole('button', { name: 'Run command' }).click();
+    await page.getByText('Built-in command').first().waitFor();
+    await page.waitForTimeout(600);
+    const d = await draft();
+    expect(d.layout.objects.length === before + 1, `expected ${before + 1} objects, got ${d.layout.objects.length}`);
+    expect(d.layout.objects.at(-1).variant === 'planet', 'last object is not a planet');
+  });
+
+  await check('AI fallback turns a free-form request into a real object', async () => {
+    const before = await count();
+    await page.getByLabel('What should HELL build?').fill('conjure something shiny and precious');
+    await page.getByRole('button', { name: 'Run command' }).click();
+    await page.getByText('Added a golden crystal.').waitFor({ timeout: 8000 });
+    await page.waitForTimeout(600);
+    const d = await draft();
+    expect(d.layout.objects.length === before + 1, 'AI result was not applied');
+    expect(d.layout.objects.at(-1).variant === 'crystal', 'AI object type wrong');
+  });
+
+  await check('One undo reverts a whole command', async () => {
+    const before = await count();
+    await page.getByRole('button', { name: 'Close Ask HELL' }).click();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await page.waitForTimeout(600);
+    expect((await count()) === before - 1, 'undo did not revert the AI change');
+  });
+
+  await check('"Save this layout" saves to the server', async () => {
+    await page.getByRole('button', { name: 'Ask HELL to build' }).click();
+    await page.getByLabel('What should HELL build?').fill('save this layout as Smoke deck');
+    await page.getByRole('button', { name: 'Run command' }).click();
+    await page.getByText('Saved “Smoke deck”.').waitFor({ timeout: 8000 });
+  });
+
+  await check('Desktop app at / still renders', async () => {
+    const desk = await ctx.newPage();
+    await desk.setViewportSize({ width: 1280, height: 800 });
+    await desk.route('**/*', fakeServer(freshState()));
+    await desk.goto(`${base}/`, { waitUntil: 'networkidle' });
+    await desk.locator('textarea').first().waitFor({ timeout: 10000 });
+    await desk.close();
+  });
+
+  await check('No JavaScript errors during the run', async () => {
+    expect(errors.length === 0, errors.slice(0, 3).join(' | '));
+  });
+  await ctx.close();
+}
+
+{
+  const state = { ...freshState(), speech: true, heard: 'HELL, build me a 3D rotating planet' };
+  const { ctx, page, errors } = await newPage(state, { ...IPHONE_12_APP, permissions: ['microphone'] });
+  await check('Dashboard voice: "build me a 3D rotating planet" opens the builder and builds it', async () => {
+    await page.goto(`${base}/m`, { waitUntil: 'networkidle' });
+    await page.locator('.hd-dock').getByRole('button', { name: 'Talk to HELL' }).click();
+    await page.getByRole('button', { name: 'Stop and send' }).waitFor({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Stop and send' }).click();
+    await page.waitForURL('**/m/hologram', { timeout: 8000 });
+    await page.getByText('Created a rotating planet.').waitFor({ timeout: 15000 });
+  });
+  await check('Dashboard voice: ordinary requests still go to chat', async () => {
+    state.heard = 'what is on my schedule';
+    await page.goto(`${base}/m`, { waitUntil: 'networkidle' });
+    await page.locator('.hd-dock').getByRole('button', { name: 'Talk to HELL' }).click();
+    await page.getByRole('button', { name: 'Stop and send' }).click();
+    await page.waitForURL('**/m/chat', { timeout: 8000 });
+    await page.getByText('Systems online.').waitFor({ timeout: 10000 });
+    expect(errors.length === 0, errors.slice(0, 3).join(' | '));
+  });
+  await ctx.close();
+}
+
+{
+  const state = freshState();
+  state.authRequired = true;
+  const { ctx, page, errors } = await newPage(state);
+  await check('Sign-in: wrong passcode refused, right one unlocks HELL', async () => {
+    await page.goto(`${base}/m`, { waitUntil: 'networkidle' });
+    await page.getByText('Welcome back').waitFor();
+    await page.getByLabel('Passcode').fill('nope');
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await page.getByText('Wrong passcode').waitFor();
+    await page.getByLabel('Passcode').fill('correct horse');
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await page.locator('.hd').waitFor({ timeout: 10000 });
+    expect(errors.length === 0, errors.slice(0, 3).join(' | '));
+  });
+  await ctx.close();
+}
+
+await browser.close();
+await new Promise((r) => server.httpServer.close(r));
+
+const failed = results.filter((r) => !r.ok);
+console.log(`\n${results.length - failed.length}/${results.length} checks passed${failed.length ? ` — ${failed.length} FAILED` : ''}.`);
+process.exit(failed.length ? 1 : 0);
