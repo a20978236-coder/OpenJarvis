@@ -303,3 +303,81 @@ def test_default_location_is_openjarvis_home(tmp_path, monkeypatch):
     s = PersonalStore()
     s.close()
     assert (tmp_path / "personal.db").exists()
+
+
+# ----------------------------------------------------------------------
+# Hologram layouts
+# ----------------------------------------------------------------------
+
+
+class TestHolograms:
+    LAYOUT = {
+        "version": 1,
+        "name": "Deck",
+        "scene": {"background": "grid", "lighting": 1},
+        "objects": [{"id": "a", "type": "orb"}, {"id": "b", "type": "clock"}],
+    }
+
+    def test_create_list_get_update_delete(self, client):
+        r = client.post(
+            "/v1/personal/holograms", json={"name": " Deck ", "data": self.LAYOUT}
+        )
+        assert r.status_code == 201
+        h = r.json()
+        assert h["name"] == "Deck" and h["objects"] == 2
+        assert h["data"]["objects"][1]["type"] == "clock"
+
+        summaries = client.get("/v1/personal/holograms").json()["holograms"]
+        assert [s["id"] for s in summaries] == [h["id"]]
+        assert "data" not in summaries[0]  # list stays light
+
+        data2 = {**self.LAYOUT, "objects": self.LAYOUT["objects"][:1]}
+        r = client.put(
+            f"/v1/personal/holograms/{h['id']}", json={"name": "Deck 2", "data": data2}
+        )
+        assert (
+            r.status_code == 200
+            and r.json()["objects"] == 1
+            and r.json()["name"] == "Deck 2"
+        )
+        assert client.get(f"/v1/personal/holograms/{h['id']}").json()["data"] == data2
+
+        assert client.delete(f"/v1/personal/holograms/{h['id']}").status_code == 204
+        assert client.get(f"/v1/personal/holograms/{h['id']}").status_code == 404
+
+    def test_most_recent_first(self, client):
+        a = client.post(
+            "/v1/personal/holograms", json={"name": "A", "data": self.LAYOUT}
+        ).json()
+        client.post("/v1/personal/holograms", json={"name": "B", "data": self.LAYOUT})
+        client.put(
+            f"/v1/personal/holograms/{a['id']}", json={"name": "A", "data": self.LAYOUT}
+        )
+        names = [
+            h["name"] for h in client.get("/v1/personal/holograms").json()["holograms"]
+        ]
+        assert names == ["A", "B"]
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {"name": "", "data": {}},
+            {"name": "  ", "data": {}},
+            {"name": "x" * 61, "data": {}},
+            {"name": "ok", "data": {"objects": "nope"}},
+            {"name": "ok", "data": {"objects": [{}] * 201}},
+            {"name": "ok", "data": {"objects": [], "blob": "x" * (256 * 1024)}},
+            {"name": "ok"},
+        ],
+    )
+    def test_validation(self, client, body):
+        assert client.post("/v1/personal/holograms", json=body).status_code == 422
+
+    def test_unknown_layout(self, client):
+        assert (
+            client.put(
+                "/v1/personal/holograms/nope", json={"name": "x", "data": {}}
+            ).status_code
+            == 404
+        )
+        assert client.delete("/v1/personal/holograms/nope").status_code == 404

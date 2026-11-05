@@ -140,8 +140,8 @@ export function MobileShell() {
 
 function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; signOut: () => Promise<void> }) {
   const navigate = useNavigate();
-  // The dashboard is a full-screen hub with its own top bar and dock.
-  const onDashboard = /^\/m\/?$/.test(useLocation().pathname);
+  // The dashboard and the Hologram Builder are full-screen with their own controls.
+  const onDashboard = /^\/m\/?$|^\/m\/hologram\/?$/.test(useLocation().pathname);
   const [online, setOnline] = useState<boolean | null>(null);
   const [serverLatencyMs, setLatency] = useState<number | null>(null);
   const updateSettings = useAppStore((s) => s.updateSettings);

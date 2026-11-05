@@ -22,6 +22,7 @@ import { HoloDashboard } from './mobile/dashboard/HoloDashboard';
 import { ModuleScreen } from './mobile/pages/ModuleScreen';
 import { MobileSettings } from './mobile/pages/MobileSettings';
 import { AiModules } from './mobile/pages/AiModules';
+import { HologramBuilder } from './mobile/hologram/HologramBuilder';
 import { MobileChat } from './mobile/pages/MobileChat';
 import { MobileMemory } from './mobile/pages/MobileMemory';
 import { MobileTasks } from './mobile/pages/MobileTasks';
@@ -200,6 +201,7 @@ export default function App() {
           <Route path="tasks" element={<MobileTasks />} />
           <Route path="settings" element={<MobileSettings />} />
           <Route path="ai" element={<AiModules />} />
+          <Route path="hologram" element={<HologramBuilder />} />
           <Route path="module/:id" element={<ModuleScreen />} />
         </Route>
         <Route element={<Layout />}>

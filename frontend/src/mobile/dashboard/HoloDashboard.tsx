@@ -314,7 +314,7 @@ export function HoloDashboard() {
           <span className="hd-chamfer-in" aria-hidden="true" />
           <Camera size={24} aria-hidden="true" />
         </button>
-        <button type="button" className="hd-holo hd-chamfer" onClick={() => navigate('/m/module/hologram')} aria-label="Hologram Builder — coming in stage C">
+        <button type="button" className="hd-holo hd-chamfer" onClick={() => navigate('/m/hologram')} aria-label="Hologram Builder">
           <span className="hd-chamfer-in" aria-hidden="true" />
           <Boxes size={30} strokeWidth={1.4} aria-hidden="true" />
         </button>

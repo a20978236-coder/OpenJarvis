@@ -7,8 +7,9 @@ route when ``OPENJARVIS_API_KEY`` is set.
 from __future__ import annotations
 
 import datetime as _dt
+import json
 import threading
-from typing import Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
@@ -171,6 +172,72 @@ def update_task(task_id: str, req: TaskUpdate, request: Request):
 def delete_task(task_id: str, request: Request):
     if not _store(request).delete_task(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
+    return Response(status_code=204)
+
+
+# ----------------------------------------------------------------------
+# Hologram layouts
+# ----------------------------------------------------------------------
+
+_HOLO_MAX_BYTES = 256 * 1024
+_HOLO_MAX_OBJECTS = 200
+
+
+class HologramSave(BaseModel):
+    name: str = Field(..., min_length=1, max_length=60)
+    data: Dict[str, Any]
+
+    @field_validator("name")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("name must not be blank")
+        return v
+
+    @field_validator("data")
+    @classmethod
+    def _bounded(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        objects = v.get("objects", [])
+        if not isinstance(objects, list):
+            raise ValueError("data.objects must be a list")
+        if len(objects) > _HOLO_MAX_OBJECTS:
+            raise ValueError(f"at most {_HOLO_MAX_OBJECTS} objects per layout")
+        if len(json.dumps(v, separators=(",", ":"))) > _HOLO_MAX_BYTES:
+            raise ValueError("layout is too large (256 KB max)")
+        return v
+
+
+@personal_router.get("/holograms")
+def list_holograms(request: Request):
+    return {"holograms": _store(request).list_holograms()}
+
+
+@personal_router.get("/holograms/{layout_id}")
+def get_hologram(layout_id: str, request: Request):
+    layout = _store(request).get_hologram(layout_id)
+    if layout is None:
+        raise HTTPException(status_code=404, detail="Hologram not found")
+    return layout
+
+
+@personal_router.post("/holograms", status_code=201)
+def create_hologram(req: HologramSave, request: Request):
+    return _store(request).save_hologram(None, req.name, req.data)
+
+
+@personal_router.put("/holograms/{layout_id}")
+def update_hologram(layout_id: str, req: HologramSave, request: Request):
+    layout = _store(request).save_hologram(layout_id, req.name, req.data)
+    if layout is None:
+        raise HTTPException(status_code=404, detail="Hologram not found")
+    return layout
+
+
+@personal_router.delete("/holograms/{layout_id}", status_code=204)
+def delete_hologram(layout_id: str, request: Request):
+    if not _store(request).delete_hologram(layout_id):
+        raise HTTPException(status_code=404, detail="Hologram not found")
     return Response(status_code=204)
 
 

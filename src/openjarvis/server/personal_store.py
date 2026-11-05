@@ -6,6 +6,7 @@ on the user's own machine in ``<OPENJARVIS_HOME>/personal.db``.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 import time
@@ -98,6 +99,16 @@ class PersonalStore:
                 completed_at  REAL
             );
             CREATE INDEX IF NOT EXISTS idx_tasks_done_due ON tasks (done, due);
+
+            CREATE TABLE IF NOT EXISTS holo_layouts (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                data        TEXT NOT NULL,
+                objects     INTEGER NOT NULL DEFAULT 0,
+                created_at  REAL NOT NULL,
+                updated_at  REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_holo_updated ON holo_layouts (updated_at);
             """
         )
         self._db.commit()
@@ -259,3 +270,69 @@ class PersonalStore:
         ).fetchone()[0]
         notes = self._db.execute("SELECT COUNT(*) FROM notes").fetchone()[0]
         return {"open_tasks": open_tasks, "due_today": due_today, "notes": notes}
+
+    # ------------------------------------------------------------------
+    # Hologram layouts (Hologram Builder). The layout JSON is opaque here;
+    # the client validates it field by field whenever it loads one.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _holo_summary(row: sqlite3.Row) -> Dict[str, Any]:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "objects": row["objects"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+    @_locked
+    def list_holograms(self, limit: int = 100) -> List[Dict[str, Any]]:
+        rows = self._db.execute(
+            "SELECT id, name, objects, created_at, updated_at FROM holo_layouts"
+            " ORDER BY updated_at DESC LIMIT ?",
+            (limit,),
+        )
+        return [self._holo_summary(r) for r in rows]
+
+    @_locked
+    def get_hologram(self, layout_id: str) -> Optional[Dict[str, Any]]:
+        row = self._db.execute(
+            "SELECT * FROM holo_layouts WHERE id = ?", (layout_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return {**self._holo_summary(row), "data": json.loads(row["data"])}
+
+    @_locked
+    def save_hologram(
+        self, layout_id: Optional[str], name: str, data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Create (``layout_id=None``) or overwrite a layout. None if missing."""
+        now = time.time()
+        payload = json.dumps(data, separators=(",", ":"))
+        count = len(data.get("objects") or [])
+        if layout_id is None:
+            layout_id = uuid.uuid4().hex
+            self._db.execute(
+                "INSERT INTO holo_layouts"
+                " (id, name, data, objects, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (layout_id, name, payload, count, now, now),
+            )
+        else:
+            cur = self._db.execute(
+                "UPDATE holo_layouts SET name = ?, data = ?, objects = ?,"
+                " updated_at = ? WHERE id = ?",
+                (name, payload, count, now, layout_id),
+            )
+            if cur.rowcount == 0:
+                return None
+        self._db.commit()
+        return self.get_hologram(layout_id)
+
+    @_locked
+    def delete_hologram(self, layout_id: str) -> bool:
+        cur = self._db.execute("DELETE FROM holo_layouts WHERE id = ?", (layout_id,))
+        self._db.commit()
+        return cur.rowcount > 0
