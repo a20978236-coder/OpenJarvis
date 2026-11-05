@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import {
   Activity,
   AlignCenter,
@@ -32,6 +32,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  Wand2,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -39,7 +40,9 @@ import { toast } from 'sonner';
 import { useHolo } from './holo-store';
 import { starterLayout, type AlignMode } from './holo-ops';
 import { CATALOG, HOLO_TYPES, LIMITS, SWATCHES, VARIANTS, type HoloObject, type HoloType, type PanelShape } from './holo-types';
-import { deleteHologram, listHolograms, loadHologram, saveHologram, type HologramSummary } from './holo-api';
+import { deleteHologram, listHolograms, loadHologram, type HologramSummary } from './holo-api';
+import { saveCurrentHologram } from './holo-runner';
+import { CommandSheet } from './CommandSheet';
 import './hologram.css';
 
 // The 3D scene (three.js + React Three Fiber) loads on demand.
@@ -279,8 +282,13 @@ const ALIGNS: Array<[AlignMode, string]> = [
 ];
 
 function AlignSheet({ id, onClose }: { id: string; onClose: () => void }) {
+  const snap = useHolo((s) => s.snap);
   return (
     <Sheet title="Align" onClose={onClose}>
+      <label className="holo-toggle">
+        <input type="checkbox" className="hell-switch" checked={snap} onChange={(e) => useHolo.getState().setSnap(e.target.checked)} />
+        <span>Snap to grid while dragging</span>
+      </label>
       <div className="holo-grid2">
         {ALIGNS.map(([mode, label]) => (
           <button key={mode} type="button" className="jm-icon-btn" style={{ width: '100%' }} onClick={() => { useHolo.getState().apply({ op: 'align', id, mode }); onClose(); }}>
@@ -417,7 +425,7 @@ function RenameSheet({ onClose }: { onClose: () => void }) {
 // Page
 // ---------------------------------------------------------------------------
 
-type SheetKind = 'add' | 'edit' | 'align' | 'scene' | 'layouts' | 'rename' | null;
+type SheetKind = 'add' | 'edit' | 'align' | 'scene' | 'layouts' | 'rename' | 'ask' | null;
 
 export function HologramBuilder() {
   const navigate = useNavigate();
@@ -429,7 +437,14 @@ export function HologramBuilder() {
   const mode = useHolo((s) => s.mode);
   const dirty = useHolo((s) => s.dirty);
   const savedId = useHolo((s) => s.savedId);
-  const [sheet, setSheet] = useState<SheetKind>(null);
+  // A command spoken on the dashboard ("HELL, build me a planet") arrives here.
+  const location = useLocation();
+  const incoming = (location.state as { command?: string } | null)?.command;
+  const [pendingCommand, setPendingCommand] = useState<string | undefined>(incoming);
+  const [sheet, setSheet] = useState<SheetKind>(incoming ? 'ask' : null);
+  useEffect(() => {
+    if (incoming) navigate(location.pathname, { replace: true, state: null });
+  }, [incoming]); // eslint-disable-line react-hooks/exhaustive-deps
   const [saving, setSaving] = useState(false);
   const [exitVisible, setExitVisible] = useState(true);
   const selected = layout.objects.find((o) => o.id === selectedId) ?? null;
@@ -459,9 +474,8 @@ export function HologramBuilder() {
   const save = async () => {
     setSaving(true);
     try {
-      const { id } = await saveHologram(savedId, layout);
-      useHolo.getState().markSaved(id);
-      toast.success(`Saved “${layout.name}”`);
+      const name = await saveCurrentHologram();
+      toast.success(`Saved “${name}”`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not save');
     } finally {
@@ -531,15 +545,20 @@ export function HologramBuilder() {
             <button type="button" className="holo-tool holo-tool-add" onClick={() => setSheet(sheet === 'add' ? null : 'add')} aria-label="Add object" aria-expanded={sheet === 'add'}>
               <Plus size={24} />
             </button>
+            <button type="button" className="holo-tool holo-tool-ask" onClick={() => setSheet(sheet === 'ask' ? null : 'ask')} aria-label="Ask HELL to build" aria-expanded={sheet === 'ask'}>
+              <Wand2 size={20} />
+            </button>
             <button type="button" className="holo-tool" onClick={() => useHolo.getState().undo()} disabled={!canUndo} aria-label="Undo">
               <Undo2 size={20} />
             </button>
             <button type="button" className="holo-tool" onClick={() => useHolo.getState().redo()} disabled={!canRedo} aria-label="Redo">
               <Redo2 size={20} />
             </button>
-            <button type="button" className="holo-tool" onClick={() => useHolo.getState().setSnap(!snap)} aria-pressed={snap} aria-label="Snap to grid">
-              <Magnet size={20} />
-            </button>
+            {!selected && (
+              <button type="button" className="holo-tool" onClick={() => useHolo.getState().setSnap(!snap)} aria-pressed={snap} aria-label="Snap to grid">
+                <Magnet size={20} />
+              </button>
+            )}
             {selected ? (
               <>
                 <button type="button" className="holo-tool" onClick={() => setSheet('align')} aria-label="Align">
@@ -568,6 +587,15 @@ export function HologramBuilder() {
           {sheet === 'scene' && <SceneSheet onClose={() => setSheet(null)} />}
           {sheet === 'layouts' && <LayoutsSheet onClose={() => setSheet(null)} />}
           {sheet === 'rename' && <RenameSheet onClose={() => setSheet(null)} />}
+          {sheet === 'ask' && (
+            <CommandSheet
+              initial={pendingCommand}
+              onClose={() => {
+                setPendingCommand(undefined);
+                setSheet(null);
+              }}
+            />
+          )}
         </>
       )}
     </div>

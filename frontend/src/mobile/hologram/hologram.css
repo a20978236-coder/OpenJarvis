@@ -85,20 +85,24 @@
 
 .holo-toolbar {
   position: absolute;
-  left: 10px;
-  right: 10px;
+  left: 6px;
+  right: 6px;
   bottom: calc(env(safe-area-inset-bottom) + 10px);
   z-index: 4;
   display: flex;
   justify-content: space-between;
-  gap: 4px;
-  padding: 6px;
+  gap: 2px;
+  padding: 5px;
+  /* Never cut a tool off: narrow phones scroll the bar instead. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
   border-radius: 18px;
   border: 1px solid var(--jm-border);
   background: rgba(5, 12, 30, 0.9);
 }
 .holo-tool {
-  flex: 1;
+  flex: 1 0 44px;
   display: grid;
   place-items: center;
   min-width: 44px;
@@ -335,4 +339,69 @@
 
 @media (prefers-reduced-motion: reduce) {
   .holo-sheet { animation: none; }
+}
+
+/* ---- Ask HELL ----------------------------------------------------------- */
+.holo-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+.holo-chip {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--jm-border);
+  background: rgba(0, 179, 255, 0.08);
+  color: var(--jm-text);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.holo-chip:disabled { opacity: 0.5; }
+.holo-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.holo-log-busy {
+  font-size: 13px;
+  color: var(--jm-cyan);
+}
+.holo-log-entry {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 107, 129, 0.35);
+  background: rgba(255, 107, 129, 0.06);
+}
+.holo-log-entry[data-ok] {
+  border-color: var(--jm-border);
+  background: rgba(0, 179, 255, 0.06);
+}
+.holo-log-you {
+  font-size: 13px;
+  color: var(--jm-text-2);
+}
+.holo-log-reply {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin-top: 3px;
+  font-size: 14.5px;
+  color: var(--jm-text);
+}
+.holo-log-reply svg { flex: none; margin-top: 3px; color: var(--jm-cyan); }
+.holo-log-source {
+  margin-top: 2px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--jm-text-3);
+  text-transform: uppercase;
+}
+.holo-tool-ask {
+  color: var(--jm-cyan);
 }

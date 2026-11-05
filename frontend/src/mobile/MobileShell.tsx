@@ -15,6 +15,7 @@ import { MobileSignIn } from './MobileSignIn';
 import './mobile.css';
 import { HellWordmark } from './HellWordmark';
 import { OrbCustomizer } from './OrbCustomizer';
+import { isBuilderCommand } from './hologram/holo-commands';
 import { HellOrb } from './HellOrb';
 
 /**
@@ -237,6 +238,12 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
       const text = await dictate();
       if (!text) {
         toast("Didn't catch that — try again.");
+        return;
+      }
+      // "HELL, build me a rotating planet" goes to the Hologram Builder, which
+      // makes the change; everything else is a chat message.
+      if (isBuilderCommand(text)) {
+        navigate('/m/hologram', { state: { command: text } });
         return;
       }
       navigate('/m/chat');
