@@ -250,6 +250,9 @@ class MemoryService:
     def clear_facts(self) -> int:
         return self._store.clear()
 
+    def forget_fact(self, index: int, expected_text: str) -> bool:
+        return self._store.remove_reviewed(index, expected_text)
+
     def fact_count(self) -> int:
         return self._store.count()
 

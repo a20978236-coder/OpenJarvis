@@ -157,6 +157,51 @@ class SQLiteMemory(MemoryBackend):
         """Return the number of stored documents — always via Rust backend."""
         return self._rust_impl.count()
 
+    def list_documents(
+        self, *, limit: int = 50, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Return stored documents, newest first, including their ids.
+
+        The Rust backend owns all writes; this is a read-only side connection
+        to the same file (WAL mode lets it read alongside the writer). It is
+        what lets a UI show individual entries so they can be deleted by id.
+        """
+        if self._db_path == ":memory:":
+            raise NotImplementedError("Listing is not supported for in-memory DBs")
+        path = Path(self._db_path).expanduser().resolve()
+        if not path.exists():
+            return []
+        conn = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True, timeout=10)
+        try:
+            rows = conn.execute(
+                "SELECT id, content, source, metadata, created_at FROM documents"
+                " ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?",
+                (max(0, int(limit)), max(0, int(offset))),
+            ).fetchall()
+        finally:
+            conn.close()
+        docs: List[Dict[str, Any]] = []
+        for doc_id, content, source, metadata, created_at in rows:
+            try:
+                meta = json.loads(metadata) if metadata else {}
+            except (TypeError, ValueError):
+                meta = {}
+            docs.append(
+                {
+                    "id": doc_id,
+                    "content": content,
+                    "source": source or "",
+                    "metadata": meta if isinstance(meta, dict) else {},
+                    # Stored as a Julian day; convert to Unix seconds.
+                    "created_at": (
+                        (float(created_at) - 2440587.5) * 86400.0
+                        if created_at is not None
+                        else None
+                    ),
+                }
+            )
+        return docs
+
     def close(self) -> None:
         """Close the database connection."""
         pass

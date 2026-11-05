@@ -502,3 +502,34 @@ def test_load_configured_facts_skips_disabled_memory():
     config = SimpleNamespace(memory=SimpleNamespace(enabled=False))
 
     assert load_configured_facts(config) == []
+
+
+class TestRemoveReviewed:
+    def test_removes_only_the_matching_fact(self, tmp_path):
+        store = LocalFactStore(tmp_path / "facts.jsonl")
+        store.add("likes espresso", trust=TRUST_AUTO)
+        store.add("lives in Leeds", trust=TRUST_AUTO)
+        store.add("has a dog", trust=TRUST_AUTO)
+
+        assert store.remove_reviewed(1, "lives in Leeds") is True
+        assert [f.text for f in store.list()] == ["likes espresso", "has a dog"]
+        # Persisted, not just in memory.
+        reopened = LocalFactStore(tmp_path / "facts.jsonl")
+        assert [f.text for f in reopened.list()] == ["likes espresso", "has a dog"]
+
+    def test_refuses_when_text_no_longer_matches_index(self, tmp_path):
+        store = LocalFactStore(tmp_path / "facts.jsonl")
+        store.add("a", trust=TRUST_AUTO)
+        store.add("b", trust=TRUST_AUTO)
+        # Another process removed "a", so index 0 is now "b".
+        other = LocalFactStore(tmp_path / "facts.jsonl")
+        assert other.remove_reviewed(0, "a") is True
+        assert store.remove_reviewed(0, "a") is False
+        assert [f.text for f in store.list()] == ["b"]
+
+    def test_out_of_range_index(self, tmp_path):
+        store = LocalFactStore(tmp_path / "facts.jsonl")
+        store.add("a", trust=TRUST_AUTO)
+        assert store.remove_reviewed(5, "a") is False
+        assert store.remove_reviewed(-1, "a") is False
+        assert store.count() == 1

@@ -12,12 +12,13 @@ from typing import Any, Dict, List, Optional
 from fastapi import (
     APIRouter,
     HTTPException,
+    Query,
     Request,
     Response,
     WebSocket,
     WebSocketDisconnect,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,13 @@ class MemorySearchRequest(BaseModel):
 
 class MemoryIndexRequest(BaseModel):
     path: str
+
+
+class ForgetFactRequest(BaseModel):
+    # Index as returned by GET /v1/memory/facts, plus the text the user saw,
+    # so a concurrent write that shifts indexes can never delete the wrong fact.
+    index: int = Field(..., ge=0)
+    text: str = Field(..., min_length=1)
 
 
 class BudgetLimitsRequest(BaseModel):
@@ -267,6 +275,94 @@ def memory_search(req: MemorySearchRequest, request: Request):
         return {"results": items}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@memory_router.get("/documents")
+def memory_list_documents(
+    request: Request,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """List stored memory documents (newest first) with their ids."""
+    backend = _get_memory_backend(request)
+    if backend is None:
+        return {"documents": [], "total": 0}
+    lister = getattr(backend, "list_documents", None)
+    if lister is None:
+        raise HTTPException(
+            status_code=501,
+            detail=f"Memory backend '{getattr(backend, 'backend_id', '?')}'"
+            " does not support listing",
+        )
+    try:
+        return {
+            "documents": lister(limit=limit, offset=offset),
+            "total": backend.count(),
+        }
+    except NotImplementedError as exc:
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@memory_router.delete("/documents/{doc_id}", status_code=204)
+def memory_delete_document(doc_id: str, request: Request):
+    """Delete one stored memory document by id."""
+    backend = _get_memory_backend(request)
+    if backend is None:
+        raise HTTPException(status_code=503, detail="Memory is not configured")
+    try:
+        deleted = backend.delete(doc_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Memory entry not found")
+    return Response(status_code=204)
+
+
+@memory_router.get("/facts")
+def memory_list_facts(request: Request):
+    """Facts learned automatically from conversations (oldest first).
+
+    ``recallable`` is false for facts quarantined by the injection scanner;
+    those are kept for review but never placed in model prompts.
+    """
+    service = getattr(request.app.state, "memory_service", None)
+    if service is None:
+        return {"enabled": False, "facts": []}
+    facts = service.list_facts()
+    return {
+        "enabled": True,
+        "facts": [
+            {
+                "index": i,
+                "text": f.text,
+                "source": f.source,
+                "created_at": f.created_at or None,
+                "trust": f.trust,
+                "recallable": f.trusted_for_recall,
+            }
+            for i, f in enumerate(facts)
+        ],
+    }
+
+
+@memory_router.post("/facts/forget")
+def memory_forget_fact(req: ForgetFactRequest, request: Request):
+    """Forget one learned fact."""
+    service = getattr(request.app.state, "memory_service", None)
+    if service is None:
+        raise HTTPException(status_code=503, detail="Automatic memory is off")
+    try:
+        removed = service.forget_fact(req.index, req.text)
+    except NotImplementedError as exc:
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
+    if not removed:
+        raise HTTPException(
+            status_code=409,
+            detail="That fact changed or no longer exists — refresh and try again",
+        )
+    return {"status": "forgotten"}
 
 
 @memory_router.get("/stats")
