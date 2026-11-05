@@ -20,7 +20,8 @@ interface CameraState {
   error: string | null;
   /** A captured frame is being analysed (drives the orb's vision state). */
   analyzing: boolean;
-  start: (facing?: Facing) => Promise<void>;
+  /** `size` lowers the resolution (hand tracking needs far less than Vision). */
+  start: (facing?: Facing, size?: { width: number; height: number }) => Promise<void>;
   stop: () => void;
   flip: () => Promise<void>;
   setAnalyzing: (on: boolean) => void;
@@ -44,7 +45,7 @@ export const useCamera = create<CameraState>((set, get) => ({
   error: null,
   analyzing: false,
 
-  start: async (facing) => {
+  start: async (facing, size) => {
     const want = facing ?? get().facing;
     get().stream?.getTracks().forEach((t) => t.stop());
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -55,7 +56,7 @@ export const useCamera = create<CameraState>((set, get) => ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: { facingMode: { ideal: want }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: { ideal: want }, width: { ideal: size?.width ?? 1280 }, height: { ideal: size?.height ?? 720 } },
       });
       // A stop() may have happened while the permission prompt was open.
       if (get().status !== 'starting') {

@@ -142,7 +142,8 @@ async function newPage(state, opts = IPHONE_12_APP) {
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
     // The upstream KaTeX font is blocked by the production CSP; harmless.
-    if (m.type() === 'error' && !/Failed to load resource|KaTeX|data:font/.test(m.text())) errors.push(m.text());
+    // MediaPipe's WebAssembly prints its native INFO/W lines through console.error.
+    if (m.type() === 'error' && !/Failed to load resource|KaTeX|data:font|XNNPACK|^[IWE]\d{4} /.test(m.text())) errors.push(m.text());
   });
   await page.route('**/*', fakeServer(state));
   return { ctx, page, errors };
@@ -314,6 +315,26 @@ console.log(`HELL smoke test — ${base}\n`);
     expect((await stored()).hand === 'left', 'one tap reset it');
     await page.getByRole('button', { name: 'Tap again to reset calibration' }).click();
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('hell-gestures-v1') || '{}').hand === 'right');
+  });
+
+  await check('Hand gestures: on-device model loads from this server, camera off releases it', async () => {
+    const outside = [];
+    const onReq = (r) => {
+      const u = r.url();
+      if (!u.startsWith(base) && !u.startsWith('blob:') && !u.startsWith('data:')) outside.push(u);
+    };
+    page.on('request', onReq);
+    await ctx.grantPermissions(['camera'], { origin: base });
+    await page.goto(`${base}/m`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Camera hand gestures off' }).click();
+    await page.locator('.hand-panel[data-status=on]').waitFor({ timeout: 60000 });
+    await page.getByText('Show a hand').waitFor({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Turn hand gestures off' }).click();
+    await page.locator('.hand-panel').waitFor({ state: 'detached', timeout: 5000 });
+    const live = await page.evaluate(() => [...document.querySelectorAll('video')].filter((v) => v.srcObject).length);
+    page.off('request', onReq);
+    expect(live === 0, 'camera still in use after turning hand gestures off');
+    expect(outside.length === 0, `requests left this server: ${outside.join(', ')}`);
   });
 
   await check('Desktop app at / still renders', async () => {

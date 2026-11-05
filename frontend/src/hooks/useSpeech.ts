@@ -87,12 +87,31 @@ export function useSpeech() {
     });
   }, []);
 
+  /** Stop recording and throw the audio away (nothing is transcribed or sent). */
+  const cancelRecording = useCallback((): void => {
+    const recorder = mediaRecorderRef.current;
+    const finish = () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      chunksRef.current = [];
+      setState('idle');
+    };
+    if (!recorder || recorder.state !== 'recording') {
+      finish();
+      return;
+    }
+    recorder.onstop = finish;
+    recorder.ondataavailable = null;
+    recorder.stop();
+  }, []);
+
   return {
     state,
     error,
     available,
     startRecording,
     stopRecording,
+    cancelRecording,
     isRecording: state === 'recording',
     isTranscribing: state === 'transcribing',
   };

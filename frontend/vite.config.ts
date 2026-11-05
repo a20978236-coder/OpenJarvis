@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { handAssetsPlugin } from './scripts/hand-assets.mjs';
 
 // VITE_SUPABASE_ANON_KEY is intentionally NOT required here: a missing key
 // disables the savings leaderboard at runtime (see src/lib/supabase.ts) rather
@@ -22,6 +23,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    handAssetsPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
@@ -48,7 +50,17 @@ export default defineConfig({
         // installed app still opens without a connection (API calls are
         // excluded below and fail visibly instead of returning HTML).
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/v1\//, /^\/health/, /^\/dashboard/, /^\/api\//],
+        navigateFallbackDenylist: [/^\/v1\//, /^\/health/, /^\/dashboard/, /^\/api\//, /^\/mediapipe\//],
+        // Hand tracking (~20 MB) is not precached; it's fetched the first time
+        // camera hand gestures are turned on, then kept for offline use.
+        globIgnores: ['mediapipe/**'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/mediapipe/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'hell-hand-tracking', expiration: { maxEntries: 8 } },
+          },
+        ],
       },
     }),
   ],

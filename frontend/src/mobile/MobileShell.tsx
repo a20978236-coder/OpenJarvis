@@ -41,6 +41,8 @@ interface MobileContextValue {
   listen: () => Promise<void>;
   /** Stop a recording and return the transcript without sending it. */
   dictate: () => Promise<string | null>;
+  /** Stop a recording and discard it (nothing is sent). */
+  cancelListening: () => void;
   /** Scatter-and-reform burst: "HELL online". */
   activate: () => void;
   /** Flash the orb red briefly. */
@@ -371,13 +373,14 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
       toggleTalk,
       listen,
       dictate,
+      cancelListening: speech.cancelRecording,
       activate,
       flashError,
       openOrbSettings,
       authVia,
       signOut,
     }),
-    [online, serverLatencyMs, orbState, speech.state, speech.available, toggleTalk, listen, dictate, activate, flashError, openOrbSettings, authVia, signOut],
+    [online, serverLatencyMs, orbState, speech.state, speech.available, toggleTalk, listen, dictate, speech.cancelRecording, activate, flashError, openOrbSettings, authVia, signOut],
   );
 
   const toggleVoiceOut = () => {

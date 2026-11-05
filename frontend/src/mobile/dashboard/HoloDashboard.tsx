@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Boxes, Camera, ChevronUp, Keyboard, Mic, Send, Square, Volume2, VolumeX, X } from 'lucide-react';
+import { Boxes, Camera, ChevronUp, Hand, Keyboard, Mic, Send, Square, Volume2, VolumeX, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { useTtsStore } from '../../lib/tts';
 import { getPersonalSummary } from '../../lib/personal-api';
@@ -11,6 +11,8 @@ import { useMobile } from '../MobileShell';
 import { MODULES, type HellModule } from './modules';
 import { fitOrb } from './layout';
 import { useGestures } from '../gestures/gesture-settings';
+import { HandControl } from '../hands/HandControl';
+import { useHands } from '../hands/hand-store';
 import { WeatherCard, WeatherSheet } from './WeatherCard';
 import './dashboard.css';
 
@@ -142,6 +144,7 @@ export function HoloDashboard() {
   const voiceOut = useAppStore((s) => s.settings.voiceOutputEnabled && s.settings.voiceAutoplay);
   const updateSettings = useAppStore((s) => s.updateSettings);
   const minimized = useGestures((s) => s.dashView === 'minimized');
+  const handsOn = useHands((s) => s.wanted);
 
   useEffect(() => {
     if (!online) return;
@@ -224,6 +227,16 @@ export function HoloDashboard() {
           >
             {voiceOut ? <Volume2 size={14} aria-hidden="true" /> : <VolumeX size={14} aria-hidden="true" />}
             Voice <b>{voiceOut ? 'On' : 'Off'}</b>
+          </button>
+          <button
+            type="button"
+            className="hd-chip hd-chip-btn"
+            onClick={() => useHands.getState().setWanted(!handsOn)}
+            aria-pressed={handsOn}
+            aria-label={handsOn ? 'Camera hand gestures on' : 'Camera hand gestures off'}
+          >
+            <Hand size={14} aria-hidden="true" />
+            Hands <b>{handsOn ? 'On' : 'Off'}</b>
           </button>
         </div>
       </header>
@@ -328,6 +341,7 @@ export function HoloDashboard() {
         </button>
       </div>
 
+      <HandControl />
       {weatherOpen && <WeatherSheet onClose={() => setWeatherOpen(false)} />}
     </div>
   );
