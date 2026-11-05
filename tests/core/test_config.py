@@ -247,11 +247,11 @@ class TestAgentConfigNew:
         )
 
     def test_default_system_prompt_anchors_identity(self) -> None:
-        """#540: the hardened wording must name OpenJarvis and explicitly
-        deny the model's training identity so distilled models stop
-        claiming to be Claude/ChatGPT/etc."""
+        """#540: the hardened wording must name the assistant (HELL) and
+        explicitly deny the model's training identity so distilled models
+        stop claiming to be Claude/ChatGPT/etc."""
         prompt = AgentConfig().default_system_prompt
-        assert "OpenJarvis" in prompt
+        assert "identify yourself as HELL" in prompt
         assert "not Claude" in prompt
 
 

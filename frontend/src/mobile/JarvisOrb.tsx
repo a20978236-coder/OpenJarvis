@@ -295,7 +295,7 @@ export function JarvisOrb({ state, size = 240, onPress, disabled, label, showCap
           <canvas ref={canvasRef} aria-hidden="true" />
         </button>
       ) : (
-        <div className="jm-orb" style={{ width: size, height: size, cursor: 'default' }} role="img" aria-label={label ?? `Jarvis: ${caption}`}>
+        <div className="jm-orb" style={{ width: size, height: size, cursor: 'default' }} role="img" aria-label={label ?? `HELL: ${caption}`}>
           <canvas ref={canvasRef} aria-hidden="true" />
         </div>
       )}

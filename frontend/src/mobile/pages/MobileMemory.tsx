@@ -121,11 +121,11 @@ function LearnedView({ query }: { query: string }) {
   if (facts === null) return null;
   if (!enabled) {
     return (
-      <EmptyState text="Automatic memory is off on your server, so Jarvis isn't learning facts from your chats. You can still teach it things above." />
+      <EmptyState text="Automatic memory is off on your server, so HELL isn't learning facts from your chats. You can still teach it things above." />
     );
   }
   const shown = filterByText(facts, query, (f) => f.text);
-  if (facts.length === 0) return <EmptyState text="Nothing learned yet. Jarvis picks up facts about you as you chat." />;
+  if (facts.length === 0) return <EmptyState text="Nothing learned yet. HELL picks up facts about you as you chat." />;
   if (shown.length === 0) return <EmptyState text="No matching facts." />;
 
   return (
@@ -199,7 +199,7 @@ function SavedView({ query, refreshKey }: { query: string; refreshKey: number })
 
   if (error) return <p style={{ color: 'var(--jm-danger)', fontSize: 14 }}>{error}</p>;
   if (docs === null) return null;
-  if (docs.length === 0) return <EmptyState text="Nothing saved yet. Use “Teach Jarvis something” above." />;
+  if (docs.length === 0) return <EmptyState text="Nothing saved yet. Use “Teach HELL something” above." />;
   const shown = filterByText(docs, query, (d) => d.content);
 
   return (
@@ -279,7 +279,7 @@ export function MobileMemory() {
       <header>
         <h1 style={{ fontSize: 24, fontWeight: 600 }}>Memory</h1>
         <p style={{ fontSize: 14, color: 'var(--jm-text-2)', marginTop: 2 }}>
-          What Jarvis knows about you, stored on your server. Delete anything you don’t want it to use.
+          What HELL knows about you, stored on your server. Delete anything you don’t want it to use.
         </p>
       </header>
 
@@ -290,11 +290,11 @@ export function MobileMemory() {
           void remember();
         }}
       >
-        <label className="sr-only" htmlFor="jm-remember">Teach Jarvis something</label>
+        <label className="sr-only" htmlFor="jm-remember">Teach HELL something</label>
         <input
           id="jm-remember"
           className="jm-field"
-          placeholder="Teach Jarvis something…"
+          placeholder="Teach HELL something…"
           value={newFact}
           onChange={(e) => setNewFact(e.target.value)}
           enterKeyHint="done"

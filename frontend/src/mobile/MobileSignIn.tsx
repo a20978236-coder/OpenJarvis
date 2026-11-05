@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react';
 import { signIn, SignInError } from '../lib/session-api';
 import { JarvisOrb } from './JarvisOrb';
 import './mobile.css';
+import { HellWordmark } from './HellWordmark';
 
 /**
  * Passcode screen. A correct passcode gets an HttpOnly session cookie from
@@ -57,14 +58,14 @@ export function MobileSignIn({ onSignedIn }: { onSignedIn: () => void | Promise<
   return (
     <div className="jm">
       <header className="jm-header">
-        <span className="jm-wordmark">J.A.R.V.I.S.</span>
+        <HellWordmark />
       </header>
       <main className="jm-main" style={{ justifyContent: 'center', padding: '0 24px 48px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-          <JarvisOrb state={busy ? 'thinking' : 'idle'} size={170} showCaption={false} label="Jarvis" />
+          <JarvisOrb state={busy ? 'thinking' : 'idle'} size={170} showCaption={false} label="HELL" />
           <div style={{ textAlign: 'center' }}>
             <h1 style={{ fontSize: 24, fontWeight: 600 }}>Welcome back</h1>
-            <p style={{ fontSize: 15, color: 'var(--jm-text-2)', marginTop: 4 }}>Enter your passcode to unlock Jarvis.</p>
+            <p style={{ fontSize: 15, color: 'var(--jm-text-2)', marginTop: 4 }}>Enter your passcode to unlock HELL.</p>
           </div>
           <form
             style={{ width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 10 }}

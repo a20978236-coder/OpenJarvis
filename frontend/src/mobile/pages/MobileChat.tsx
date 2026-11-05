@@ -130,7 +130,7 @@ export function MobileChat() {
             onClick={() => void toggleTalk()}
             disabled={transcribing || online === false}
             aria-pressed={recording}
-            aria-label={recording ? 'Stop and send voice message' : transcribing ? 'Transcribing' : 'Talk to Jarvis'}
+            aria-label={recording ? 'Stop and send voice message' : transcribing ? 'Transcribing' : 'Talk to HELL'}
             style={recording ? { color: '#fff', background: 'var(--jm-danger)', borderColor: 'transparent' } : undefined}
           >
             {recording ? <Square size={18} fill="currentColor" /> : <Mic size={20} className={transcribing ? 'jm-pulse' : undefined} />}
@@ -143,7 +143,7 @@ export function MobileChat() {
           className="jm-field"
           rows={1}
           value={draft}
-          placeholder={recording ? 'Listening…' : selectedModel ? 'Message Jarvis' : 'No model available'}
+          placeholder={recording ? 'Listening…' : selectedModel ? 'Message HELL' : 'No model available'}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             // Hardware keyboards: Enter sends, Shift+Enter adds a line.

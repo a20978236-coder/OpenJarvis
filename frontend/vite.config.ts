@@ -25,8 +25,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'OpenJarvis',
-        short_name: 'Jarvis',
+        name: 'HELL',
+        short_name: 'HELL',
         description: 'Personal AI assistant',
         id: '/',
         // Installed iPhone app opens the mobile UI; desktop stays at '/'.

@@ -13,6 +13,7 @@ import { deriveOrbState } from './orb-state';
 import { JarvisOrb, type OrbState } from './JarvisOrb';
 import { MobileSignIn } from './MobileSignIn';
 import './mobile.css';
+import { HellWordmark } from './HellWordmark';
 
 /**
  * One voice pipeline for the whole mobile app: the orb on Home and the mic in
@@ -244,7 +245,7 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
             role="status"
             aria-label={online === null ? 'Connecting' : online ? 'Online' : 'Offline'}
           />
-          <span className="jm-wordmark">J.A.R.V.I.S.</span>
+          <HellWordmark />
           <span style={{ flex: 1 }} />
           <button
             type="button"
