@@ -191,6 +191,7 @@ nav:
       - Channels & Connectors: user-guide/channels-and-connectors.md
       - Tools: user-guide/tools.md
       - Memory: user-guide/memory.md
+      - Jarvis on iPhone: user-guide/iphone.md
       - External MCP Servers: user-guide/mcp-external-servers.md
       - Scheduler: user-guide/scheduler.md
       - Telemetry: user-guide/telemetry.md
