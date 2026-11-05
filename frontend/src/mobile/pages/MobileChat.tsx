@@ -65,7 +65,7 @@ export function MobileChat() {
         <select
           id="jm-model"
           className="jm-field"
-          style={{ flex: 1, minHeight: 40, padding: '6px 12px', fontSize: 14 }}
+          style={{ flex: 1, minHeight: 44, padding: '6px 12px', fontSize: 14 }}
           value={selectedModel}
           onChange={(e) => setSelectedModel(e.target.value)}
           disabled={chatModels.length === 0}
@@ -78,7 +78,7 @@ export function MobileChat() {
         <button
           type="button"
           className="jm-icon-btn"
-          style={{ width: 40, height: 40 }}
+          style={{ width: 44, height: 44 }}
           onClick={() => {
             if (streamState.isStreaming) stop();
             createConversation(selectedModel);

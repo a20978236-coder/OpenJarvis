@@ -267,14 +267,17 @@ describe('iOS audio unlock', () => {
     await flush();
     expect(FakeAudio.instances).toHaveLength(1);
     const primed = FakeAudio.instances[0];
-    expect(primed.src.startsWith('data:audio/wav')).toBe(true);
+    // blob:, never data: -- the server's CSP (media-src 'self' blob:) blocks
+    // data: URLs, which would silently defeat the unlock on a real deploy.
+    expect(primed.src).toBe('blob:fake/1');
+    expect(revoked).toContain('blob:fake/1'); // silent clip released once primed
 
     synth.mockResolvedValue(new Blob(['x']));
     await useTtsStore.getState().speak('m1', 'Hello there');
 
     // No new element: playback went through the unlocked one.
     expect(FakeAudio.instances).toHaveLength(1);
-    expect(primed.src).toBe('blob:fake/1');
+    expect(primed.src).toBe('blob:fake/2');
     expect(primed.playCalls).toBe(2);
     expect(useTtsStore.getState().state).toBe('speaking');
   });

@@ -43,10 +43,19 @@ let healthProbe: Promise<void> | null = null;
  * first tap plays a few milliseconds of silence on one element, and every
  * later utterance reuses that already-unlocked element.
  */
-const SILENT_WAV =
-  'data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAACA'
+// 10 ms of 8 kHz mono silence. Played from a blob: URL, not a data: URL,
+// because the server's Content-Security-Policy allows `media-src 'self' blob:`
+// only (a data: URL is blocked there, which would silently skip the unlock).
+const SILENT_WAV_BASE64 =
+  'UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAACA'
   + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg'
   + 'ICAgICAgICAgICAgICAgICAgICAgA==';
+
+function silentWavUrl(): string {
+  const bytes = Uint8Array.from(atob(SILENT_WAV_BASE64), (c) => c.charCodeAt(0));
+  return URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+}
+
 let unlockedEl: HTMLAudioElement | null = null;
 let unlockInstalled = false;
 let removeUnlockListeners: (() => void) | null = null;
@@ -54,11 +63,18 @@ let removeUnlockListeners: (() => void) | null = null;
 /** Prime one audio element for playback; must run inside a user gesture. */
 export function unlockAudioPlayback(): void {
   if (unlockedEl || typeof Audio === 'undefined') return;
+  let url: string | null = null;
+  const release = () => {
+    if (url) URL.revokeObjectURL(url);
+    url = null;
+  };
   try {
-    const el = new Audio(SILENT_WAV);
+    url = silentWavUrl();
+    const el = new Audio(url);
     const played = el.play();
     const markUnlocked = () => {
       el.pause();
+      release();
       unlockedEl = el;
       removeUnlockListeners?.();
       removeUnlockListeners = null;
@@ -66,11 +82,13 @@ export function unlockAudioPlayback(): void {
     if (played && typeof played.then === 'function') {
       played.then(markUnlocked).catch(() => {
         // Gesture did not qualify; the next one will try again.
+        release();
       });
     } else {
       markUnlocked();
     }
   } catch {
+    release();
     // Audio unavailable; playback falls back to a fresh element per reply.
   }
 }
