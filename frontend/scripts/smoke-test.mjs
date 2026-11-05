@@ -300,6 +300,22 @@ console.log(`HELL smoke test — ${base}\n`);
     await cdp.detach();
   });
 
+  await check('Calibration: changes are a draft until saved, then persist; reset needs two taps', async () => {
+    const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('hell-gestures-v1') || '{}'));
+    await page.goto(`${base}/m/calibration`, { waitUntil: 'networkidle' });
+    await page.getByRole('radio', { name: 'Left-handed' }).click();
+    await page.getByText('Unsaved changes').waitFor();
+    expect((await stored()).hand !== 'left', 'saved before tapping Save');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('hell-gestures-v1') || '{}').hand === 'left');
+    await page.reload({ waitUntil: 'networkidle' });
+    expect((await page.getByRole('radio', { name: 'Left-handed' }).getAttribute('aria-checked')) === 'true', 'not persisted');
+    await page.getByRole('button', { name: 'Reset calibration' }).click();
+    expect((await stored()).hand === 'left', 'one tap reset it');
+    await page.getByRole('button', { name: 'Tap again to reset calibration' }).click();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('hell-gestures-v1') || '{}').hand === 'right');
+  });
+
   await check('Desktop app at / still renders', async () => {
     const desk = await ctx.newPage();
     await desk.setViewportSize({ width: 1280, height: 800 });

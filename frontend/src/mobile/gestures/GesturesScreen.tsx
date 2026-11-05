@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ChevronLeft, Hand } from 'lucide-react';
 import { createGestureRecognizer, DEFAULT_RECOGNIZER, GESTURE_NAMES, type GestureName } from './gesture-recognizer';
-import { ACTION_LABELS, GESTURE_LABELS, useGestures } from './gesture-settings';
+import { ACTION_LABELS, effectiveAction, GESTURE_LABELS, useGestures } from './gesture-settings';
 import './gestures.css';
 
 /** Where each default action can run. */
@@ -21,6 +21,8 @@ export function GesturesScreen() {
   const enabled = useGestures((s) => s.enabled);
   const feedback = useGestures((s) => s.feedback);
   const map = useGestures((s) => s.map);
+  const hand = useGestures((s) => s.hand);
+  const act = (g: GestureName) => effectiveAction({ map, hand }, g);
   const update = useGestures((s) => s.update);
   const pad = useRef<HTMLDivElement>(null);
   const [seen, setSeen] = useState<{ g: GestureName; n: number } | null>(null);
@@ -85,7 +87,7 @@ export function GesturesScreen() {
           {seen ? (
             <p key={seen.n} className="ges-seen">
               <b>{GESTURE_LABELS[seen.g]}</b>
-              <span>{ACTION_LABELS[map[seen.g]]}</span>
+              <span>{ACTION_LABELS[act(seen.g)]}</span>
             </p>
           ) : (
             <p className="ges-hint">Swipe, pinch, double tap or long press here. Nothing runs; this pad only shows what was recognised.</p>
@@ -100,8 +102,8 @@ export function GesturesScreen() {
             <li key={g} className="ges-row">
               <span className="ges-g">{GESTURE_LABELS[g]}</span>
               <span className="ges-a">
-                {ACTION_LABELS[map[g]]}
-                <small>{WHERE[map[g]] ?? 'Dashboard'}</small>
+                {ACTION_LABELS[act(g)]}
+                <small>{WHERE[act(g)] ?? 'Dashboard'}</small>
               </span>
             </li>
           ))}
@@ -110,7 +112,10 @@ export function GesturesScreen() {
           Swipes are ignored when they start at the very top or bottom of the screen (iOS uses those), inside text boxes and sliders, or when they are slow or diagonal.
           Long press on the orb still opens orb settings; long press elsewhere on the dashboard opens Settings.
         </p>
-        <p className="ges-note">Sensitivity, left-handed mode and your own assignments arrive with Calibration (Stage F). Camera hand gestures arrive in Stage G.</p>
+        <p className="ges-note">
+          {hand === 'left' ? 'Left-handed mode is on (swipe left and right are swapped). ' : ''}Change sensitivity, handedness and what each gesture does in{' '}
+          <button type="button" className="ges-link" onClick={() => navigate('/m/calibration')}>Calibration</button>. Camera hand gestures arrive in Stage G.
+        </p>
       </section>
     </div>
   );

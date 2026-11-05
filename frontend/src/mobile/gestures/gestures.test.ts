@@ -221,7 +221,7 @@ describe('gesture settings', () => {
   it('sanitizes junk from storage', () => {
     const s = sanitizeSettings({ enabled: 'yes', tuning: { swipeDistance: 5, longPressMs: 'x' }, map: { 'swipe-up': 'rm -rf', 'swipe-left': 'next-module' } });
     expect(s.enabled).toBe(true);
-    expect(s.tuning.swipeDistance).toBe(30);
+    expect(s.tuning.swipeDistance).toBe(40);
     expect(s.tuning.longPressMs).toBe(DEFAULT_RECOGNIZER.longPressMs);
     expect(s.map['swipe-up']).toBe('open-hell');
     expect(s.map['swipe-left']).toBe('next-module');
@@ -233,7 +233,8 @@ describe('module order for swipes', () => {
   it('starts at HELL and lists only working modules', () => {
     const list = carousel();
     expect(list[0]).toMatchObject({ id: 'home', route: '/m' });
-    expect(list.map((e) => e.id)).not.toContain('calibration');
+    expect(list.map((e) => e.id)).not.toContain('apps');
+    expect(list.map((e) => e.id)).toContain('calibration');
     expect(list.map((e) => e.id)).toContain('gestures');
   });
 

@@ -85,6 +85,45 @@ export interface GestureRecognizer {
   dispose(): void;
 }
 
+export interface StrokeResult {
+  gesture: GestureName | null;
+  /** Why it was not a gesture (plain words), or '' when it was. */
+  reason: string;
+  /** Travel along the main direction, px. */
+  distance: number;
+  ms: number;
+  /** px per ms. */
+  speed: number;
+}
+
+export type Observation =
+  | ({ kind: 'swipe' } & StrokeResult)
+  | { kind: 'tap'; gapMs: number | null; gesture: GestureName | null }
+  | { kind: 'pinch'; ratio: number; gesture: GestureName | null; reason: string };
+
+/** Is one finger's stroke a swipe? Pure; also explains a rejection. */
+export function evaluateStroke(dx: number, dy: number, dtMs: number, startY: number, o: RecognizerOptions, allow: Allow): StrokeResult {
+  const ax = Math.abs(dx);
+  const ay = Math.abs(dy);
+  const ms = Math.max(1, Math.round(dtMs));
+  const distance = Math.round(Math.max(ax, ay));
+  const speed = distance / ms;
+  const out = (gesture: GestureName | null, reason: string): StrokeResult => ({ gesture, reason, distance, ms, speed });
+  if (ms > o.swipeMaxMs) return out(null, `too slow: ${ms} ms, limit ${o.swipeMaxMs} ms`);
+  if (distance < o.swipeDistance) return out(null, `too short: ${distance} px, needs ${o.swipeDistance} px`);
+  if (speed < o.minVelocity) return out(null, `not fast enough: ${speed.toFixed(2)} px/ms, needs ${o.minVelocity.toFixed(2)}`);
+  if (ax >= ay * o.dominance) {
+    if (!allow.horizontal) return out(null, 'sideways swipes are off here');
+    return out(dx < 0 ? 'swipe-left' : 'swipe-right', '');
+  }
+  if (ay >= ax * o.dominance) {
+    if (!allow.vertical) return out(null, 'up/down swipes are off here');
+    if (startY < o.edgeGuard || startY > o.viewportHeight - o.edgeGuard) return out(null, 'started at the screen edge (iOS uses it)');
+    return out(dy < 0 ? 'swipe-up' : 'swipe-down', '');
+  }
+  return out(null, 'too diagonal');
+}
+
 /**
  * `emit` is called once per recognised gesture. `schedule` lets tests drive
  * the long-press timer; it defaults to setTimeout.
@@ -96,6 +135,8 @@ export function createGestureRecognizer(
     const id = setTimeout(fn, ms);
     return () => clearTimeout(id);
   },
+  /** Optional: every finished stroke, tap and pinch with its numbers (live testing). */
+  observe?: (o: Observation) => void,
 ): GestureRecognizer {
   const pts = new Map<number, Pt>();
   let mode: 'idle' | 'single' | 'pinch' | 'dead' = 'idle';
@@ -125,22 +166,9 @@ export function createGestureRecognizer(
   };
 
   function swipe(p: Pt, t: number): GestureName | null {
-    const o = options();
-    const dx = p.x - p.sx;
-    const dy = p.y - p.sy;
-    const ax = Math.abs(dx);
-    const ay = Math.abs(dy);
-    const dt = Math.max(1, t - p.t0);
-    if (dt > o.swipeMaxMs) return null;
-    const d = Math.max(ax, ay);
-    if (d < o.swipeDistance || d / dt < o.minVelocity) return null;
-    if (ax >= ay * o.dominance && allow.horizontal) return dx < 0 ? 'swipe-left' : 'swipe-right';
-    if (ay >= ax * o.dominance && allow.vertical) {
-      const nearEdge = p.sy < o.edgeGuard || p.sy > o.viewportHeight - o.edgeGuard;
-      if (nearEdge) return null;
-      return dy < 0 ? 'swipe-up' : 'swipe-down';
-    }
-    return null;
+    const r = evaluateStroke(p.x - p.sx, p.y - p.sy, t - p.t0, p.sy, options(), allow);
+    observe?.({ kind: 'swipe', ...r });
+    return r.gesture;
   }
 
   return {
@@ -200,11 +228,14 @@ export function createGestureRecognizer(
           if (g) emit(g);
         } else if (!longFired && allow.press) {
           // The gap that matters is first lift -> second touch-down.
-          if (lastTap && p.t0 - lastTap.t <= o.doubleTapMs && Math.hypot(x - lastTap.x, y - lastTap.y) <= o.tapTolerance * 3) {
+          const gap = lastTap && Math.hypot(x - lastTap.x, y - lastTap.y) <= o.tapTolerance * 3 ? p.t0 - lastTap.t : null;
+          if (gap !== null && gap <= o.doubleTapMs) {
             lastTap = null;
+            observe?.({ kind: 'tap', gapMs: gap, gesture: 'double-tap' });
             emit('double-tap');
           } else {
             lastTap = { t, x, y };
+            observe?.({ kind: 'tap', gapMs: gap, gesture: null });
           }
         }
         reset();
@@ -214,8 +245,9 @@ export function createGestureRecognizer(
         pinchNow = dist();
         const ratio = pinchStart > 0 ? pinchNow / pinchStart : 1;
         mode = 'dead';
-        if (ratio >= 1 + o.pinchRatio) emit('pinch-out');
-        else if (ratio <= 1 / (1 + o.pinchRatio)) emit('pinch-in');
+        const g: GestureName | null = ratio >= 1 + o.pinchRatio ? 'pinch-out' : ratio <= 1 / (1 + o.pinchRatio) ? 'pinch-in' : null;
+        observe?.({ kind: 'pinch', ratio, gesture: g, reason: g ? '' : `fingers moved ${Math.round(Math.abs(ratio - 1) * 100)}%, needs ${Math.round(o.pinchRatio * 100)}%` });
+        if (g) emit(g);
       }
       pts.delete(id);
       if (pts.size === 0) reset();

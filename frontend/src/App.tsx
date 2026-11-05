@@ -25,6 +25,7 @@ import { AiModules } from './mobile/pages/AiModules';
 import { HologramBuilder } from './mobile/hologram/HologramBuilder';
 import { VisionScreen } from './mobile/vision/VisionScreen';
 import { GesturesScreen } from './mobile/gestures/GesturesScreen';
+import { CalibrationScreen } from './mobile/gestures/CalibrationScreen';
 import { MobileChat } from './mobile/pages/MobileChat';
 import { MobileMemory } from './mobile/pages/MobileMemory';
 import { MobileTasks } from './mobile/pages/MobileTasks';
@@ -206,6 +207,7 @@ export default function App() {
           <Route path="hologram" element={<HologramBuilder />} />
           <Route path="vision" element={<VisionScreen />} />
           <Route path="gestures" element={<GesturesScreen />} />
+          <Route path="calibration" element={<CalibrationScreen />} />
           <Route path="module/:id" element={<ModuleScreen />} />
         </Route>
         <Route element={<Layout />}>

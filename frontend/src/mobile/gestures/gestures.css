@@ -105,3 +105,78 @@
 @media (prefers-reduced-motion: reduce) {
   .ges-seen { animation: none; }
 }
+.ges-link {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--jm-cyan);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---- Calibration --------------------------------------------------------- */
+.cal-section { display: flex; flex-direction: column; gap: 10px; }
+.ges-card.cal-section { padding: 14px; }
+.cal-h { font-size: 16px; font-weight: 650; }
+.cal-p { font-size: 14px; line-height: 1.5; color: var(--jm-text-2); display: flex; gap: 6px; align-items: flex-start; }
+.cal-p svg { flex: none; margin-top: 3px; color: var(--jm-cyan); }
+.cal-choices { display: flex; gap: 8px; }
+.cal-choices > button { flex: 1; min-height: 44px; }
+.cal-wide { width: auto; padding: 0 14px; min-height: 44px; }
+.cal-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cal-knob { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
+.cal-knob-top { display: flex; justify-content: space-between; gap: 8px; font-size: 14.5px; font-weight: 600; }
+.cal-knob output { font-weight: 500; color: var(--jm-cyan); font-variant-numeric: tabular-nums; }
+.cal-knob input[type='range'] { width: 100%; min-height: 32px; accent-color: var(--jm-blue); }
+.cal-knob small { font-size: 12.5px; color: var(--jm-text-3); }
+.cal-assign { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14.5px; }
+.cal-assign > span { flex: none; font-weight: 600; }
+.cal-assign select { flex: 1 1 auto; min-width: 0; max-width: 62%; min-height: 44px; font-size: 14px; }
+.cal-step { font-size: 15px; text-align: center; }
+.cal-step b { color: var(--jm-cyan); }
+.cal-pad { height: 200px; margin-top: 0; }
+.cal-arrow { color: var(--jm-cyan); filter: drop-shadow(0 0 10px var(--jm-glow)); animation: cal-nudge 1.1s ease-in-out infinite; }
+.cal-arrow[data-dir='swipe-left'] { --nx: -14px; --ny: 0; }
+.cal-arrow[data-dir='swipe-right'] { --nx: 14px; --ny: 0; }
+.cal-arrow[data-dir='swipe-up'] { --nx: 0; --ny: -14px; }
+.cal-arrow[data-dir='swipe-down'] { --nx: 0; --ny: 14px; }
+.cal-arrow[data-dir='double-tap'] { --nx: 0; --ny: 0; animation-name: cal-pulse; }
+@keyframes cal-nudge { 0%, 100% { transform: translate(0, 0); opacity: 0.7; } 50% { transform: translate(var(--nx), var(--ny)); opacity: 1; } }
+@keyframes cal-pulse { 0%, 100% { transform: scale(1); } 25%, 60% { transform: scale(0.86); } }
+.cal-dots { display: flex; justify-content: center; gap: 6px; }
+.cal-dots span { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--jm-border-strong); }
+.cal-dots span[data-done] { background: var(--jm-cyan); border-color: var(--jm-cyan); }
+.cal-dots span[data-now] { box-shadow: 0 0 0 3px rgba(0, 179, 255, 0.3); }
+.cal-msg { min-height: 21px; font-size: 14px; text-align: center; color: var(--jm-text-2); }
+.cal-train { display: flex; flex-direction: column; gap: 10px; }
+.cal-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.cal-table th, .cal-table td { padding: 6px 4px; text-align: left; border-bottom: 1px solid var(--jm-border); }
+.cal-table thead th { font-size: 12px; color: var(--jm-text-3); font-weight: 600; }
+.cal-table tbody th { font-weight: 600; }
+.cal-table tr[data-changed] td:last-child { color: var(--jm-cyan); font-weight: 600; }
+.cal-why { font-size: 13px; color: var(--jm-text-3); }
+.ges-seen[data-miss] b { color: #ffb547; }
+.cal-bar {
+  /* Sticks to the bottom only while there is something to save. */
+  position: static;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 4px -4px 0;
+  border-radius: 16px;
+  border: 1px solid var(--jm-border);
+  background: rgba(5, 12, 28, 0.96);
+}
+.cal-bar[data-dirty] { position: sticky; border-color: var(--jm-cyan); box-shadow: 0 -8px 24px -12px rgba(0, 0, 0, 0.8); }
+.cal-status { flex: 1; font-size: 13.5px; color: var(--jm-text-2); }
+.cal-bar[data-dirty] .cal-status { color: var(--jm-cyan); font-weight: 600; }
+.cal-reset { width: auto; padding: 0 12px; gap: 6px; min-height: 44px; }
+.cal-bar .jm-primary-btn { min-height: 44px; padding: 0 16px; gap: 6px; }
+@media (prefers-reduced-motion: reduce) {
+  .cal-arrow { animation: none; }
+}

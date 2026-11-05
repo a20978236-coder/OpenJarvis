@@ -54,9 +54,28 @@ export interface GestureSettings {
   /** Show a short label when a gesture is recognised. */
   feedback: boolean;
   /** Recognizer thresholds (tuned in Calibration, Stage F). */
-  tuning: Pick<RecognizerOptions, 'swipeDistance' | 'swipeMaxMs' | 'pinchRatio' | 'doubleTapMs' | 'longPressMs'>;
+  tuning: Tuning;
   map: Record<GestureName, GestureAction>;
+  /** Left-handed mode swaps what swipe left and swipe right do. */
+  hand: 'right' | 'left';
 }
+
+export type Tuning = Pick<RecognizerOptions, 'swipeDistance' | 'swipeMaxMs' | 'minVelocity' | 'dominance' | 'pinchRatio' | 'doubleTapMs' | 'longPressMs'>;
+
+/**
+ * Safe ranges for every tunable. The floors stop calibration from making
+ * gestures hair-trigger (accidental activation); the ceilings keep them
+ * reachable.
+ */
+export const TUNING_LIMITS: Record<keyof Tuning, [number, number]> = {
+  swipeDistance: [40, 180],
+  swipeMaxMs: [300, 1300],
+  minVelocity: [0.1, 0.8],
+  dominance: [1.2, 3],
+  pinchRatio: [0.12, 0.6],
+  doubleTapMs: [180, 600],
+  longPressMs: [350, 1400],
+};
 
 export const DEFAULT_SETTINGS: GestureSettings = {
   enabled: true,
@@ -64,12 +83,24 @@ export const DEFAULT_SETTINGS: GestureSettings = {
   tuning: {
     swipeDistance: DEFAULT_RECOGNIZER.swipeDistance,
     swipeMaxMs: DEFAULT_RECOGNIZER.swipeMaxMs,
+    minVelocity: DEFAULT_RECOGNIZER.minVelocity,
+    dominance: DEFAULT_RECOGNIZER.dominance,
     pinchRatio: DEFAULT_RECOGNIZER.pinchRatio,
     doubleTapMs: DEFAULT_RECOGNIZER.doubleTapMs,
     longPressMs: DEFAULT_RECOGNIZER.longPressMs,
   },
   map: DEFAULT_MAP,
+  hand: 'right',
 };
+
+/** The action for `g`, with left-handed mode applied. */
+export function effectiveAction(s: Pick<GestureSettings, 'map' | 'hand'>, g: GestureName): GestureAction {
+  if (s.hand === 'left') {
+    if (g === 'swipe-left') return s.map['swipe-right'];
+    if (g === 'swipe-right') return s.map['swipe-left'];
+  }
+  return s.map[g];
+}
 
 const KEY = 'hell-gestures-v1';
 const ACTIONS = Object.keys(ACTION_LABELS) as GestureAction[];
@@ -90,13 +121,10 @@ export function sanitizeSettings(raw: unknown): GestureSettings {
   return {
     enabled: typeof r.enabled === 'boolean' ? r.enabled : true,
     feedback: typeof r.feedback === 'boolean' ? r.feedback : true,
-    tuning: {
-      swipeDistance: clamp(t.swipeDistance, 30, 200, d.swipeDistance),
-      swipeMaxMs: clamp(t.swipeMaxMs, 250, 1500, d.swipeMaxMs),
-      pinchRatio: clamp(t.pinchRatio, 0.1, 0.8, d.pinchRatio),
-      doubleTapMs: clamp(t.doubleTapMs, 180, 600, d.doubleTapMs),
-      longPressMs: clamp(t.longPressMs, 350, 1500, d.longPressMs),
-    },
+    tuning: Object.fromEntries(
+      (Object.keys(TUNING_LIMITS) as (keyof Tuning)[]).map((k) => [k, clamp(t[k], TUNING_LIMITS[k][0], TUNING_LIMITS[k][1], d[k])]),
+    ) as unknown as Tuning,
+    hand: r.hand === 'left' ? 'left' : 'right',
     map,
   };
 }
@@ -120,9 +148,9 @@ interface GestureStore extends GestureSettings {
 
 export const useGestures = create<GestureStore>((set, get) => {
   const save = () => {
-    const { enabled, feedback, tuning, map } = get();
+    const { enabled, feedback, tuning, map, hand } = get();
     try {
-      localStorage.setItem(KEY, JSON.stringify({ enabled, feedback, tuning, map }));
+      localStorage.setItem(KEY, JSON.stringify({ enabled, feedback, tuning, map, hand }));
     } catch {
       // Not saved; applies for this session.
     }
@@ -131,8 +159,8 @@ export const useGestures = create<GestureStore>((set, get) => {
     ...load(),
     dashView: 'full',
     update: (patch) => {
-      const { enabled, feedback, tuning, map } = get();
-      set(sanitizeSettings({ enabled, feedback, tuning, map, ...patch }));
+      const { enabled, feedback, tuning, map, hand } = get();
+      set(sanitizeSettings({ enabled, feedback, tuning, map, hand, ...patch }));
       save();
     },
     reset: () => {

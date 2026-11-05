@@ -35,7 +35,7 @@ export const MODULES: HellModule[] = [
   { id: 'hologram', label: 'Hologram Builder', icon: Boxes, side: 'left', route: '/m/hologram', stage: null, summary: 'Build your own 3D holographic interfaces.' },
   { id: 'vision', label: 'Vision', icon: ScanEye, side: 'left', route: '/m/vision', stage: null, summary: 'Point the camera and ask HELL what it sees, read signs and explain controls.' },
   { id: 'gestures', label: 'Gestures', icon: Hand, side: 'left', route: '/m/gestures', stage: null, summary: 'Swipe and pinch to drive HELL without hunting for buttons. Camera hand gestures arrive in Stage G.' },
-  { id: 'calibration', label: 'Calibration', icon: Crosshair, side: 'left', route: '/m/module/calibration', stage: 'F', summary: 'Tune gesture sensitivity, handedness and response speed, then test live.' },
+  { id: 'calibration', label: 'Calibration', icon: Crosshair, side: 'left', route: '/m/calibration', stage: null, summary: 'Train and tune gesture sensitivity, handedness, speed and assignments, then test live.' },
   { id: 'memory', label: 'Memory', icon: Brain, side: 'left', route: '/m/memory', stage: null, summary: 'What HELL knows about you.' },
   { id: 'tasks', label: 'Tasks', icon: CheckSquare, side: 'left', route: '/m/tasks', stage: null, summary: 'Your tasks.' },
   { id: 'apps', label: 'Apps', icon: LayoutGrid, side: 'right', route: '/m/module/apps', stage: 'I', summary: "HELL's tools plus buttons that run your iOS Shortcuts." },

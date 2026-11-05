@@ -20,7 +20,7 @@ import { useCamera } from './vision/camera';
 import { HellOrb } from './HellOrb';
 import { useHolo } from './hologram/holo-store';
 import type { GestureName } from './gestures/gesture-recognizer';
-import { ACTION_LABELS, GESTURE_LABELS, stepCarousel, useGestures } from './gestures/gesture-settings';
+import { ACTION_LABELS, effectiveAction, GESTURE_LABELS, stepCarousel, useGestures } from './gestures/gesture-settings';
 import { useTouchGestures, type GestureContext } from './gestures/useTouchGestures';
 
 /**
@@ -301,7 +301,7 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
   /** Run what `g` is assigned to here; returns a label, or null if it doesn't apply. */
   const runGesture = (g: GestureName): string | null => {
     const gs = useGestures.getState();
-    const action = gs.map[g];
+    const action = effectiveAction(gs, g);
     const dash = gestureCtx === 'dashboard';
     switch (action) {
       case 'open-hell':
