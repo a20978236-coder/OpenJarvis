@@ -180,3 +180,11 @@
 @media (prefers-reduced-motion: reduce) {
   .cal-arrow { animation: none; }
 }
+
+/* ---- Voice settings ---------------------------------------------------- */
+.voice-status { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--jm-text-2); }
+.voice-status > span { color: #ff6b81; font-size: 10px; }
+.voice-status[data-ok] > span { color: #3ddc97; }
+.holo-toggle svg { vertical-align: -2px; }
+.voice-error { font-size: 13px; color: #ffb547; }
+.voice-inline { display: inline-flex; align-items: center; gap: 6px; }

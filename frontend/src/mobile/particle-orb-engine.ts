@@ -61,7 +61,8 @@ const BASE: OrbTargets = { energy: 0.45, expand: 0, spiral: 0, speed: 0.35, puls
 export function targetsFor(state: OrbState): OrbTargets {
   switch (state) {
     case 'listening':
-      return { ...BASE, energy: 1, expand: 1, speed: 0.55 };
+      // pulse > 0 lets the microphone level move the particles (your voice).
+      return { ...BASE, energy: 1, expand: 1, speed: 0.55, pulse: 0.7 };
     case 'thinking':
       return { ...BASE, energy: 0.8, spiral: 1, speed: 2.2 };
     case 'speaking':
@@ -383,7 +384,7 @@ export interface OrbEngineOptions {
 
 export interface OrbEngine {
   setState(state: OrbState): void;
-  /** Live audio level 0–1 while speaking; null = use a synthetic envelope. */
+  /** Live audio level 0–1 (HELL's voice while speaking, yours while listening); null = synthetic envelope when speaking. */
   setLevel(level: number | null): void;
   setPrefs(prefs: OrbPrefs): void;
   setSize(size: number): void;
@@ -673,7 +674,9 @@ export function createOrbEngine(canvas: HTMLCanvasElement, opts: OrbEngineOption
     cur.scatter = lerp(cur.scatter, 0, 1 - Math.exp(-dt * 2.6));
     // Speaking: real audio level when provided, otherwise a speech-like envelope.
     const synthetic = 0.5 + 0.5 * Math.sin(time * 7.3) * Math.sin(time * 2.1 + 1) * (0.6 + 0.4 * Math.sin(time * 13.7));
-    cur.level = lerp(cur.level, externalLevel ?? synthetic, 1 - Math.exp(-dt * 18));
+    // Listening without a live mic level stays calm (no fake voice).
+    const fallback = state === 'speaking' ? synthetic : 0;
+    cur.level = lerp(cur.level, externalLevel ?? fallback, 1 - Math.exp(-dt * 18));
 
     time += dt * cur.speed * prefs.speed * 2.2;
     uniforms.uTime.value = time;

@@ -1286,6 +1286,29 @@ async def tts_health(request: Request):
     }
 
 
+@speech_router.get("/voices")
+async def tts_voices(request: Request):
+    """List the voices the active text-to-speech backend offers."""
+    backend = await _resolve_tts_backend(request)
+    if backend is None:
+        return {"available": False, "voices": [], "default_voice": "", "speed": 1.0}
+    voice_id, speed = _tts_voice_and_speed(request, backend)
+    try:
+        voices = [str(v) for v in (backend.available_voices() or []) if v][:200]
+    except Exception:
+        logger.exception("Listing TTS voices failed")
+        voices = []
+    if voice_id and voice_id not in voices:
+        voices.insert(0, voice_id)
+    return {
+        "available": True,
+        "backend": getattr(backend, "backend_id", ""),
+        "voices": voices,
+        "default_voice": voice_id,
+        "speed": speed,
+    }
+
+
 # ---- Feedback routes ----
 
 feedback_router = APIRouter(prefix="/v1/feedback", tags=["feedback"])

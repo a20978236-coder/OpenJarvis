@@ -130,6 +130,8 @@ export function HoloDashboard() {
     activate,
     openOrbSettings,
     serverLatencyMs,
+    getVoiceLevel,
+    interim,
   } = useMobile();
   const { send } = useChatSender();
   const now = useClock();
@@ -254,6 +256,7 @@ export function HoloDashboard() {
             size={orbSize}
             showBase
             showCaption={false}
+            levelSource={getVoiceLevel}
             onTap={() => (orbState === 'listening' ? void toggleTalk() : activate())}
             onDoubleTap={canTalk ? () => void toggleTalk() : () => navigate('/m/chat')}
             onLongPress={openOrbSettings}
@@ -278,7 +281,7 @@ export function HoloDashboard() {
         <Waveform side="l" active={orbState === 'listening' || orbState === 'speaking'} />
         <span className="hd-listen-text">
           <Mic size={18} aria-hidden="true" />
-          {STATUS_TEXT[orbState] ?? 'Ready'}
+          {orbState === 'listening' && interim ? `“${interim.slice(-48)}”` : orbState === 'speaking' ? 'Speaking — tap the mic to interrupt' : (STATUS_TEXT[orbState] ?? 'Ready')}
         </span>
         <Waveform side="r" active={orbState === 'listening' || orbState === 'speaking'} />
       </div>

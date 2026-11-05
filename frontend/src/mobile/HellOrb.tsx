@@ -16,6 +16,8 @@ interface HellOrbProps extends PressHandlers {
   showBase?: boolean;
   /** Live speech level 0–1, or null for the built-in envelope. */
   level?: number | null;
+  /** Polled every frame for a live level (no re-render); wins over `level`. */
+  levelSource?: () => number | null;
   disabled?: boolean;
 }
 
@@ -37,6 +39,7 @@ export function HellOrb({
   caption,
   showBase = false,
   level = null,
+  levelSource,
   disabled,
   onTap,
   onDoubleTap,
@@ -91,6 +94,20 @@ export function HellOrb({
 
   useEffect(() => engineRef.current?.setState(state), [state, mode]);
   useEffect(() => engineRef.current?.setLevel(level), [level, mode]);
+  // Live level (voice-reactive particles) without re-rendering React 60x/s.
+  const sourceRef = useRef(levelSource);
+  sourceRef.current = levelSource;
+  const hasSource = !!levelSource;
+  useEffect(() => {
+    if (!hasSource || mode !== '3d') return;
+    let raf = 0;
+    const tick = () => {
+      engineRef.current?.setLevel(sourceRef.current?.() ?? null);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [hasSource, mode]);
   useEffect(() => engineRef.current?.setSize(px), [px, mode]);
   useEffect(() => {
     const { palette, density, scale, speed, glow, reducedEffects } = prefs;

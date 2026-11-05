@@ -58,6 +58,16 @@ function fakeServer(state) {
     if (p === '/v1/speech/health') return route.fulfill(json({ available: state.speech }));
     if (p === '/v1/speech/transcribe') return route.fulfill(json({ text: state.heard, language: 'en', confidence: 1, duration_seconds: 1 }));
     if (p === '/v1/speech/tts/health') return route.fulfill(json({ available: false }));
+    if (p === '/v1/speech/voices') return route.fulfill(json({ available: true, backend: 'kokoro', voices: ['af_heart', 'bm_george'], default_voice: 'af_heart', speed: 1 }));
+    if (p === '/v1/speech/synthesize') {
+      state.synth.push(req.postDataJSON());
+      // 0.2 s of silence as a WAV.
+      const n = 4800, buf = Buffer.alloc(44 + n * 2);
+      buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8); buf.write('fmt ', 12);
+      buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(24000, 24);
+      buf.writeUInt32LE(48000, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 2, 40);
+      return route.fulfill({ status: 200, contentType: 'audio/wav', body: buf });
+    }
     if (p === '/v1/memory/stats') return route.fulfill(json({ entries: 3, backend: 'sqlite' }));
     if (p === '/v1/memory/facts') return route.fulfill(json({ enabled: true, facts: [{ index: 0, text: 'Likes espresso', source: 'auto', created_at: 1, trust: 'auto', recallable: true }] }));
     if (p === '/v1/memory/documents') return route.fulfill(json({ documents: [], total: 0 }));
@@ -148,7 +158,7 @@ async function newPage(state, opts = IPHONE_12_APP) {
   await page.route('**/*', fakeServer(state));
   return { ctx, page, errors };
 }
-const freshState = () => ({ authRequired: false, tasks: [], saved: null, aiCalls: 0, speech: false, heard: '', visionFrames: [] });
+const freshState = () => ({ authRequired: false, tasks: [], saved: null, aiCalls: 0, speech: false, heard: '', visionFrames: [], synth: [] });
 
 console.log(`HELL smoke test — ${base}\n`);
 
@@ -335,6 +345,22 @@ console.log(`HELL smoke test — ${base}\n`);
     page.off('request', onReq);
     expect(live === 0, 'camera still in use after turning hand gestures off');
     expect(outside.length === 0, `requests left this server: ${outside.join(', ')}`);
+  });
+
+  await check('Voice settings: chosen voice + speed reach the server; device recognition is opt-in', async () => {
+    await page.goto(`${base}/m/voice`, { waitUntil: 'networkidle' });
+    const allow = page.getByLabel('Allow iPhone speech recognition');
+    if (await allow.isEnabled()) expect(!(await allow.isChecked()), 'device recognition should default to off');
+    expect(await page.getByLabel(/Listen for/).isDisabled(), 'wake phrase must need recognition first');
+    await page.getByRole('radio', { name: 'HELL server' }).first().click();
+    await page.locator('label.cal-assign select').first().selectOption('bm_george');
+    await page.locator('input[type=range]').first().fill('1.25');
+    await page.getByRole('button', { name: 'Preview voice' }).click();
+    await page.waitForFunction(() => true);
+    const t0 = Date.now();
+    while (!state.synth.length && Date.now() - t0 < 8000) await page.waitForTimeout(100);
+    const got = state.synth[0];
+    expect(got && got.voice_id === 'bm_george' && got.speed === 1.25, `preview sent ${JSON.stringify(got)}`);
   });
 
   await check('Desktop app at / still renders', async () => {

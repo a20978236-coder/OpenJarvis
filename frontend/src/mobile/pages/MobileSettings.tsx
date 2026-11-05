@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronRight, CloudSun, LogOut, Monitor, Sparkles, Volume2 } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { ChevronRight, CloudSun, LogOut, Mic, Monitor, Sparkles, Volume2 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { useTtsStore } from '../../lib/tts';
 import { useWeatherPrefs } from '../../lib/weather-api';
@@ -31,6 +32,7 @@ function Row({ icon, title, detail, onClick, href }: { icon: React.ReactNode; ti
  */
 export function MobileSettings() {
   const { openOrbSettings, authVia, signOut } = useMobile();
+  const navigate = useNavigate();
   const voiceOut = useAppStore((s) => s.settings.voiceOutputEnabled && s.settings.voiceAutoplay);
   const updateSettings = useAppStore((s) => s.updateSettings);
   const weather = useWeatherPrefs((s) => s.source);
@@ -44,6 +46,7 @@ export function MobileSettings() {
       <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 6 }}>Settings</h1>
 
       <Row icon={<Sparkles size={20} />} title="Orb appearance" detail="Color, particles, size, speed, glow" onClick={openOrbSettings} />
+      <Row icon={<Mic size={20} />} title="Voice" detail="Voice, speaking speed, listening, wake phrase" onClick={() => navigate('/m/voice')} />
 
       <label className="jm-panel" style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 56, padding: '8px 14px', borderRadius: 14, cursor: 'pointer' }}>
         <Volume2 size={20} style={{ color: 'var(--jm-cyan)' }} aria-hidden="true" />

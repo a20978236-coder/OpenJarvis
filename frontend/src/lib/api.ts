@@ -431,6 +431,33 @@ export async function synthesizeSpeech(
   return res.blob();
 }
 
+export interface TtsVoices {
+  available: boolean;
+  backend?: string;
+  voices: string[];
+  default_voice: string;
+  speed: number;
+}
+
+/** Voices offered by the HELL server's text-to-speech backend. */
+export async function fetchTtsVoices(): Promise<TtsVoices> {
+  const empty: TtsVoices = { available: false, voices: [], default_voice: '', speed: 1 };
+  try {
+    const res = await apiFetch(`/v1/speech/voices`);
+    if (!res.ok) return empty;
+    const b = await res.json();
+    return {
+      available: b?.available === true,
+      backend: typeof b?.backend === 'string' ? b.backend : undefined,
+      voices: Array.isArray(b?.voices) ? b.voices.filter((v: unknown) => typeof v === 'string') : [],
+      default_voice: typeof b?.default_voice === 'string' ? b.default_voice : '',
+      speed: typeof b?.speed === 'number' ? b.speed : 1,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export async function fetchTtsHealth(): Promise<TtsHealth> {
   const res = await apiFetch(`/v1/speech/tts/health`);
   if (!res.ok) return { available: false };

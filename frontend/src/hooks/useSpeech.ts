@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { transcribeAudio, fetchSpeechHealth } from '../lib/api';
 import { pickRecordingMimeType, recordingFilename } from '../lib/audio-format';
+import { meterStream } from '../lib/audio-level';
 
 export type SpeechState = 'idle' | 'recording' | 'transcribing';
 
@@ -11,6 +12,11 @@ export function useSpeech() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const meterRef = useRef<ReturnType<typeof meterStream> | null>(null);
+  const closeMeter = () => {
+    meterRef.current?.close();
+    meterRef.current = null;
+  };
 
   // Check if speech backend is available on mount
   useEffect(() => {
@@ -30,6 +36,8 @@ export function useSpeech() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      // Mic level for the orb and for stopping when you pause.
+      meterRef.current = meterStream(stream);
 
       // Ask for an explicit container so the upload can be named after it;
       // iPhone Safari only records MP4, Chrome/Firefox prefer WebM.
@@ -62,6 +70,7 @@ export function useSpeech() {
         setState('transcribing');
 
         // Stop all audio tracks
+        closeMeter();
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
 
@@ -91,6 +100,7 @@ export function useSpeech() {
   const cancelRecording = useCallback((): void => {
     const recorder = mediaRecorderRef.current;
     const finish = () => {
+      closeMeter();
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
       chunksRef.current = [];
@@ -105,6 +115,9 @@ export function useSpeech() {
     recorder.stop();
   }, []);
 
+  /** Live microphone level 0..1 while recording (null if it can't be read). */
+  const getLevel = useCallback((): number | null => meterRef.current?.level() ?? null, []);
+
   return {
     state,
     error,
@@ -112,6 +125,7 @@ export function useSpeech() {
     startRecording,
     stopRecording,
     cancelRecording,
+    getLevel,
     isRecording: state === 'recording',
     isTranscribing: state === 'transcribing',
   };

@@ -6,7 +6,13 @@ import { useAppStore } from '../lib/store';
 import { checkHealth, fetchModels, fetchServerInfo } from '../lib/api';
 import { getSessionStatus, signOut as endSession, UNAUTHORIZED_EVENT } from '../lib/session-api';
 import { useTtsStore } from '../lib/tts';
-import { useSpeech, type SpeechState } from '../hooks/useSpeech';
+import type { SpeechState } from '../hooks/useSpeech';
+import { useVoiceInput } from '../hooks/useVoiceInput';
+import { stopChatStream } from '../hooks/useChatSender';
+import { getSpeechLevel } from '../lib/tts';
+import { createVad } from '../lib/vad';
+import { startWakeListener } from '../lib/device-speech';
+import { useVoicePrefs } from '../lib/voice-prefs';
 import { useChatSender } from '../hooks/useChatSender';
 import { useAutoSpeakReplies } from '../hooks/useAutoSpeakReplies';
 import { deriveOrbState } from './orb-state';
@@ -43,6 +49,10 @@ interface MobileContextValue {
   dictate: () => Promise<string | null>;
   /** Stop a recording and discard it (nothing is sent). */
   cancelListening: () => void;
+  /** Live 0..1 voice level for the orb (HELL speaking, or you), else null. */
+  getVoiceLevel: () => number | null;
+  /** Words heard so far (device recognition only). */
+  interim: string;
   /** Scatter-and-reform burst: "HELL online". */
   activate: () => void;
   /** Flash the orb red briefly. */
@@ -159,7 +169,10 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
   const streamContent = useAppStore((s) => s.streamState.content);
   const ttsState = useTtsStore((s) => s.state);
   const { send } = useChatSender();
-  const speech = useSpeech();
+  const speech = useVoiceInput();
+  // Long-lived listeners (wake phrase, timers) must use the current engine.
+  const speechRef = useRef(speech);
+  speechRef.current = speech;
 
   // Replies are spoken from any tab, not just Chat.
   useAutoSpeakReplies();
@@ -234,34 +247,178 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
     }
   }, [speech]);
 
+  /**
+   * A spoken turn is in progress or HELL is answering one: after the answer
+   * (spoken, or finished streaming when voice output is off) HELL listens
+   * again for a follow-up, when "Continue conversation" is on.
+   */
+  const voiceTurn = useRef<'idle' | 'answering'>('idle');
+  /** The current listening session is a follow-up (silence ends it quietly). */
+  const followUp = useRef(false);
+
+  const interrupt = useCallback(() => {
+    // Talking over HELL stops it, like a real conversation.
+    useTtsStore.getState().stop();
+    if (useAppStore.getState().streamState.isStreaming) stopChatStream();
+  }, []);
+
   const listen = useCallback(async () => {
     if (speech.state !== 'idle') return;
     useTtsStore.getState().stop();
+    followUp.current = false;
     await speech.startRecording();
   }, [speech]);
+
+  /** Send what was heard: builder commands go to the builder, the rest to chat. */
+  const deliver = useCallback(
+    async (text: string) => {
+      if (isBuilderCommand(text)) {
+        voiceTurn.current = 'idle';
+        navigate('/m/hologram', { state: { command: text } });
+        return;
+      }
+      voiceTurn.current = 'answering';
+      navigate('/m/chat');
+      await send(text);
+    },
+    [navigate, send],
+  );
+
+  const deliverRef = useRef(deliver);
+  deliverRef.current = deliver;
 
   const toggleTalk = useCallback(async () => {
     if (speech.state === 'transcribing') return;
     if (speech.state === 'recording') {
       const text = await dictate();
       if (!text) {
-        toast("Didn't catch that — try again.");
+        voiceTurn.current = 'idle';
+        if (!followUp.current) toast("Didn't catch that — try again.");
         return;
       }
-      // "HELL, build me a rotating planet" goes to the Hologram Builder, which
-      // makes the change; everything else is a chat message.
-      if (isBuilderCommand(text)) {
-        navigate('/m/hologram', { state: { command: text } });
-        return;
-      }
-      navigate('/m/chat');
-      await send(text);
+      await deliver(text);
       return;
     }
-    // Interrupt HELL if it is mid-sentence, like a real conversation.
-    useTtsStore.getState().stop();
+    interrupt();
+    followUp.current = false;
     await speech.startRecording();
-  }, [speech, dictate, navigate, send]);
+  }, [speech, dictate, deliver, interrupt]);
+
+  // Device recogniser: it stops by itself when you pause; send that text.
+  useEffect(() => {
+    if (speech.engine !== 'device' || speech.state !== 'recording') return;
+    const pending = speech.pendingResult();
+    if (!pending) return;
+    let live = true;
+    pending
+      .then((text) => {
+        if (!live || !text.trim()) {
+          if (live && !followUp.current) toast("Didn't catch that — try again.");
+          if (live) voiceTurn.current = 'idle';
+          return;
+        }
+        void deliverRef.current(text.trim());
+      })
+      .catch(() => {
+        voiceTurn.current = 'idle';
+      });
+    return () => {
+      live = false;
+    };
+  }, [speech.engine, speech.state]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Server recorder: stop by itself when you pause (silence detection).
+  const autoStop = useVoicePrefs((s) => s.autoStop);
+  const toggleRef = useRef(toggleTalk);
+  toggleRef.current = toggleTalk;
+  useEffect(() => {
+    if (speech.engine !== 'server' || speech.state !== 'recording' || !autoStop) return;
+    const vad = createVad();
+    const started = performance.now();
+    const id = setInterval(() => {
+      const level = speech.getLevel();
+      if (level === null) {
+        // Mic can't be measured (audio not unlocked yet): a tap ends a normal
+        // turn; an unprompted follow-up must not keep the mic open.
+        if (followUp.current && performance.now() - started > 8000) {
+          clearInterval(id);
+          speech.cancelRecording();
+          voiceTurn.current = 'idle';
+        }
+        return;
+      }
+      const st = vad.feed(level, performance.now());
+      if (st === 'done' || st === 'max') {
+        clearInterval(id);
+        void toggleRef.current();
+      } else if (st === 'no-speech') {
+        clearInterval(id);
+        speech.cancelRecording();
+        voiceTurn.current = 'idle';
+        if (!followUp.current) toast("Didn't hear anything.");
+      }
+    }, 60);
+    return () => clearInterval(id);
+  }, [speech.engine, speech.state, autoStop]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Continue the conversation: listen again once HELL has finished answering.
+  const continueConversation = useVoicePrefs((s) => s.continueConversation);
+  const ttsEngineBusy = ttsState !== 'idle';
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    const busy = isStreaming || ttsEngineBusy;
+    const finished = wasBusy.current && !busy;
+    wasBusy.current = busy;
+    if (!finished || voiceTurn.current !== 'answering') return;
+    // Voice output on: wait for the spoken answer (it starts right after the
+    // stream ends), so only act once speech has ended too.
+    const t = setTimeout(() => {
+      const tts = useTtsStore.getState();
+      const still = useAppStore.getState().streamState.isStreaming || tts.state !== 'idle';
+      if (still) return;
+      voiceTurn.current = 'idle';
+      const sp = speechRef.current;
+      if (!continueConversation || document.hidden || sp.state !== 'idle' || !sp.available) return;
+      followUp.current = true;
+      void sp.startRecording();
+    }, voiceOut ? 900 : 300);
+    return () => clearTimeout(t);
+  }, [isStreaming, ttsEngineBusy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "Hey HELL" while the app is open (iOS allows no background listening).
+  const wakeOn = useVoicePrefs((s) => s.wakePhrase && s.allowDeviceRecognition);
+  const [hidden, setHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
+  useEffect(() => {
+    const on = () => setHidden(document.hidden);
+    document.addEventListener('visibilitychange', on);
+    return () => document.removeEventListener('visibilitychange', on);
+  }, []);
+  const wakePaused = speech.state !== 'idle' || ttsEngineBusy || isStreaming || hidden;
+  const activateRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    if (!wakeOn || wakePaused) return;
+    return startWakeListener(
+      (remainder) => {
+        activateRef.current();
+        if (remainder.split(/\s+/).filter(Boolean).length >= 2) void deliverRef.current(remainder);
+        else {
+          followUp.current = false;
+          void speechRef.current.startRecording();
+        }
+      },
+      (msg) => {
+        toast.error(msg);
+        useVoicePrefs.getState().update({ wakePhrase: false });
+      },
+    );
+  }, [wakeOn, wakePaused]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Live level for the orb: HELL's voice while speaking, yours while listening. */
+  const getVoiceLevel = useCallback((): number | null => {
+    if (useTtsStore.getState().state === 'speaking') return getSpeechLevel();
+    if (speech.state === 'recording') return speech.getLevel();
+    return null;
+  }, [speech]);
 
   const derived = deriveOrbState({
     online,
@@ -363,6 +520,8 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
     return label !== null;
   });
 
+  activateRef.current = activate;
+
   const value = useMemo<MobileContextValue>(
     () => ({
       online,
@@ -374,13 +533,15 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
       listen,
       dictate,
       cancelListening: speech.cancelRecording,
+      getVoiceLevel,
+      interim: speech.interim,
       activate,
       flashError,
       openOrbSettings,
       authVia,
       signOut,
     }),
-    [online, serverLatencyMs, orbState, speech.state, speech.available, toggleTalk, listen, dictate, speech.cancelRecording, activate, flashError, openOrbSettings, authVia, signOut],
+    [online, serverLatencyMs, orbState, speech.state, speech.available, toggleTalk, listen, dictate, speech.cancelRecording, getVoiceLevel, speech.interim, activate, flashError, openOrbSettings, authVia, signOut],
   );
 
   const toggleVoiceOut = () => {

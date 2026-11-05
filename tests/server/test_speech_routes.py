@@ -384,3 +384,40 @@ def test_voice_id_not_reused_across_backends(mock_tts_backend):
 
     # Backend is mock_tts, not the configured kokoro, so bm_george must not leak.
     assert mock_tts_backend.synthesize.call_args.kwargs["voice_id"] != "bm_george"
+
+
+def test_voices_lists_backend_voices(mock_tts_backend):
+    mock_tts_backend.available_voices.return_value = ["af_heart", "bm_george"]
+    client = _tts_app(mock_tts_backend)
+
+    body = client.get("/v1/speech/voices").json()
+
+    assert body["available"] is True
+    assert "af_heart" in body["voices"] and "bm_george" in body["voices"]
+    assert isinstance(body["speed"], float)
+
+
+def test_voices_survives_a_backend_error(mock_tts_backend):
+    mock_tts_backend.available_voices.side_effect = RuntimeError("boom")
+    client = _tts_app(mock_tts_backend)
+
+    body = client.get("/v1/speech/voices").json()
+
+    assert body["available"] is True
+    assert isinstance(body["voices"], list)
+
+
+def test_voices_without_backend():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from openjarvis.server.api_routes import speech_router
+
+    app = FastAPI()
+    app.include_router(speech_router)
+    app.state.tts_resolved = True
+    app.state.tts_backend = None
+
+    body = TestClient(app).get("/v1/speech/voices").json()
+
+    assert body == {"available": False, "voices": [], "default_voice": "", "speed": 1.0}
