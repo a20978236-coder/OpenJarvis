@@ -317,6 +317,13 @@ def create_app(
     # Exposed so WebSocket handlers can authenticate the handshake (the HTTP
     # AuthMiddleware never sees WS upgrade requests). Empty = auth disabled.
     app.state.api_key = api_key
+    # Passcode sign-in for browsers (HttpOnly session cookie) whenever the
+    # API is protected by a key; see session_auth.
+    app.state.session_auth = None
+    if api_key:
+        from openjarvis.server.session_auth import SessionAuth
+
+        app.state.session_auth = SessionAuth(api_key)
 
     @app.on_event("shutdown")
     async def _shutdown_managed_runtime() -> None:
@@ -482,6 +489,9 @@ def create_app(
     app.include_router(upload_router)
     app.include_router(research_router)
     app.include_router(analytics_router)
+    from openjarvis.server.session_routes import session_router
+
+    app.include_router(session_router)
     include_all_routes(app)
 
     # Restore SendBlue channel bindings from database on startup

@@ -14,6 +14,8 @@ from starlette.responses import JSONResponse
 logger = logging.getLogger(__name__)
 
 _WS_AUTH_PROTOCOL = "openjarvis.auth.v1"
+# Sign-in endpoint: reachable signed-out, checks credentials itself.
+_SESSION_PATH = "/v1/auth/session"
 _WS_KEY_PROTOCOL_PREFIX = "openjarvis.key.b64url."
 
 
@@ -46,9 +48,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # preflight is identified by both headers required by the CORS protocol.
         if self._is_cors_preflight(request):
             return await call_next(request)
-        if self._api_key and self._requires_auth(request.url.path):
+        path = request.url.path
+        if self._api_key and self._requires_auth(path) and path != _SESSION_PATH:
             auth = request.headers.get("Authorization", "")
             if not auth:
+                # Browser sign-in: a valid session cookie (see session_auth)
+                # stands in for the Bearer key. An explicit Authorization
+                # header always takes precedence and is checked below.
+                if self._session_cookie_valid(request):
+                    if not self._cookie_request_allowed(request):
+                        return JSONResponse(
+                            {"detail": "Cross-site request refused"},
+                            status_code=403,
+                        )
+                    return await call_next(request)
                 return JSONResponse(
                     {"detail": "Missing Authorization header"},
                     status_code=401,
@@ -61,6 +74,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     status_code=401,
                 )
         return await call_next(request)
+
+    @staticmethod
+    def _session_cookie_valid(request: Request) -> bool:
+        from openjarvis.server.session_auth import COOKIE_NAME, SessionAuth
+
+        auth = getattr(request.app.state, "session_auth", None)
+        return isinstance(auth, SessionAuth) and auth.verify(
+            request.cookies.get(COOKIE_NAME)
+        )
+
+    @staticmethod
+    def _cookie_request_allowed(request: Request) -> bool:
+        """State-changing cookie requests must come from this same origin."""
+        from openjarvis.server.session_auth import SAFE_METHODS, same_origin_request
+
+        return request.method in SAFE_METHODS or same_origin_request(request)
 
     @staticmethod
     def _is_cors_preflight(request: Request) -> bool:
@@ -186,7 +215,35 @@ def authenticate_websocket(
     protocol_valid = bool(credential_protocol and expected_protocol) and (
         _api_keys_match(credential_protocol, expected_protocol)
     )
-    return header_valid or protocol_valid, selected_protocol
+    return (
+        header_valid or protocol_valid or _websocket_cookie_valid(websocket),
+        selected_protocol,
+    )
+
+
+def _websocket_cookie_valid(websocket) -> bool:  # noqa: ANN001
+    """Browser session cookie on a same-origin WebSocket handshake.
+
+    Origin is checked because WebSocket handshakes are not subject to CORS;
+    without it another site could open a socket that rides the cookie.
+    """
+    from openjarvis.server.session_auth import (
+        COOKIE_NAME,
+        SessionAuth,
+        same_origin_request,
+    )
+
+    app = getattr(websocket, "app", None)
+    auth = getattr(getattr(app, "state", None), "session_auth", None)
+    if not isinstance(auth, SessionAuth):
+        return False
+    try:
+        token = websocket.cookies.get(COOKIE_NAME)
+    except Exception:
+        return False
+    if not isinstance(token, str):
+        return False
+    return auth.verify(token) is True and same_origin_request(websocket) is True
 
 
 def websocket_authorized(websocket, expected_key: str) -> bool:  # noqa: ANN001
