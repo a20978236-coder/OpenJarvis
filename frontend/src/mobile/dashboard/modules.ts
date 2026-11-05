@@ -41,7 +41,7 @@ export const MODULES: HellModule[] = [
   { id: 'apps', label: 'Apps', icon: LayoutGrid, side: 'right', route: '/m/module/apps', stage: 'I', summary: "HELL's tools plus buttons that run your iOS Shortcuts." },
   { id: 'files', label: 'Files', icon: FolderOpen, side: 'right', route: '/m/module/files', stage: 'I', summary: 'Files on your server, and sending files from this iPhone to HELL.' },
   { id: 'notes', label: 'Notes', icon: NotebookPen, side: 'right', route: '/m/tasks?view=notes', stage: null, summary: 'Your notes.' },
-  { id: 'diagnostics', label: 'Diagnostics', icon: Activity, side: 'right', route: '/m/module/diagnostics', stage: 'I', summary: 'Microphone, camera, connection, AI, voice, memory and performance checks.' },
+  { id: 'diagnostics', label: 'Diagnostics', icon: Activity, side: 'right', route: '/m/diagnostics', stage: null, summary: 'Microphone, camera, connection, AI, voice, memory and performance checks.' },
   { id: 'settings', label: 'Settings', icon: Settings, side: 'right', route: '/m/settings', stage: null, summary: 'Orb, voice and sign-in.' },
   { id: 'ai', label: 'AI Modules', icon: Layers, side: 'right', route: '/m/ai', stage: null, summary: 'Models, agents and skills on your server.' },
 ];

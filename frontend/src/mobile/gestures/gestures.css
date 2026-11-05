@@ -124,7 +124,7 @@
 .cal-p svg { flex: none; margin-top: 3px; color: var(--jm-cyan); }
 .cal-choices { display: flex; gap: 8px; }
 .cal-choices > button { flex: 1; min-height: 44px; }
-.cal-wide { width: auto; padding: 0 14px; min-height: 44px; }
+.cal-wide { width: auto; padding: 0 14px; min-height: 44px; gap: 6px; }
 .cal-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .cal-knob { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
 .cal-knob-top { display: flex; justify-content: space-between; gap: 8px; font-size: 14.5px; font-weight: 600; }

@@ -13,6 +13,7 @@ import { getSpeechLevel } from '../lib/tts';
 import { createVad } from '../lib/vad';
 import { startWakeListener } from '../lib/device-speech';
 import { useVoicePrefs } from '../lib/voice-prefs';
+import { installErrorLog } from '../lib/error-log';
 import { useChatSender } from '../hooks/useChatSender';
 import { useAutoSpeakReplies } from '../hooks/useAutoSpeakReplies';
 import { deriveOrbState } from './orb-state';
@@ -180,6 +181,7 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
   useEffect(() => {
     applyMobileDefaultsOnce(updateSettings);
   }, [updateSettings]);
+  useEffect(() => installErrorLog(), []);
 
   // Match the iOS status bar to the navy shell while it is mounted.
   useEffect(() => {

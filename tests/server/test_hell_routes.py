@@ -147,3 +147,52 @@ def test_every_wmo_code_has_a_label():
         label, icon = hell_routes.describe_weather(code)
         assert label != "Unknown" and icon
     assert hell_routes.describe_weather(1234) == ("Unknown", "cloud")
+
+
+class _Engine:
+    engine_id = "ollama"
+
+    def health(self):
+        return True
+
+    def list_models(self):
+        return ["a", "b"]
+
+
+def test_diagnostics_reports_server_side_state(monkeypatch):
+    import httpx
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from openjarvis.server import hell_routes
+
+    app = FastAPI()
+    app.include_router(hell_routes.hell_router)
+    app.state.engine = _Engine()
+    app.state.engine_name = "ollama"
+    app.state.model = "qwen3:8b"
+    app.state.memory_prefs = {"learning": "ask"}
+    app.state.hell_http_transport = httpx.MockTransport(lambda req: httpx.Response(200, json={}))
+    body = TestClient(app).get("/v1/hell/diagnostics").json()
+    assert body["ai"] == {"engine": "ollama", "model": "qwen3:8b", "healthy": True, "models": 2, "latency_ms": body["ai"]["latency_ms"]}
+    assert body["internet"]["ok"] is True
+    assert body["memory"]["learning"] == "ask"
+    assert body["voice"] == {"stt": "", "tts": None}
+
+
+def test_diagnostics_without_internet(monkeypatch):
+    import httpx
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from openjarvis.server import hell_routes
+
+    def boom(req):
+        raise httpx.ConnectError("no route")
+
+    app = FastAPI()
+    app.include_router(hell_routes.hell_router)
+    app.state.hell_http_transport = httpx.MockTransport(boom)
+    body = TestClient(app).get("/v1/hell/diagnostics").json()
+    assert body["internet"] == {"ok": False, "error": "ConnectError"}
+    assert body["ai"]["healthy"] is False

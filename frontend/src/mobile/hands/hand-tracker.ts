@@ -39,14 +39,18 @@ function blockMediaPipeTelemetry() {
 
 let loading: Promise<GestureRecognizer> | null = null;
 
-/** Missing files fall through to the app's index.html; detect that honestly. */
-async function assertModelPresent() {
+/** Is the hand model installed on the server? (Missing files fall through to index.html.) */
+export async function handModelInstalled(): Promise<boolean> {
   // GET (the server refuses HEAD), read only the headers, then abort.
   const ctrl = new AbortController();
   const res = await fetch(MODEL, { signal: ctrl.signal }).catch(() => null);
   const type = res?.headers.get('content-type') ?? '';
   ctrl.abort();
-  if (!res || !res.ok || type.includes('text/html')) {
+  return !!res && res.ok && !type.includes('text/html');
+}
+
+async function assertModelPresent() {
+  if (!(await handModelInstalled())) {
     throw new HandTrackingUnavailable('The hand gesture model is not installed on your HELL server. Rebuild the app with internet access once (it downloads an 8 MB open-source model).');
   }
 }

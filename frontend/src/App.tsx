@@ -27,6 +27,7 @@ import { VisionScreen } from './mobile/vision/VisionScreen';
 import { GesturesScreen } from './mobile/gestures/GesturesScreen';
 import { CalibrationScreen } from './mobile/gestures/CalibrationScreen';
 import { VoiceSettings } from './mobile/voice/VoiceSettings';
+import { DiagnosticsScreen } from './mobile/diagnostics/DiagnosticsScreen';
 import { MobileChat } from './mobile/pages/MobileChat';
 import { MobileMemory } from './mobile/pages/MobileMemory';
 import { MobileTasks } from './mobile/pages/MobileTasks';
@@ -210,6 +211,7 @@ export default function App() {
           <Route path="gestures" element={<GesturesScreen />} />
           <Route path="calibration" element={<CalibrationScreen />} />
           <Route path="voice" element={<VoiceSettings />} />
+          <Route path="diagnostics" element={<DiagnosticsScreen />} />
           <Route path="module/:id" element={<ModuleScreen />} />
         </Route>
         <Route element={<Layout />}>

@@ -383,6 +383,14 @@ console.log(`HELL smoke test — ${base}\n`);
     expect((await page.getByText(/Waiting for your approval/).count()) === 0, 'pending list did not refresh');
   });
 
+  await check('Diagnostics: all nine checks render, even with a partial server reply', async () => {
+    await page.goto(`${base}/m/diagnostics`, { waitUntil: 'networkidle' });
+    await page.locator('.dg-row').nth(8).waitFor({ timeout: 10000 });
+    const titles = await page.locator('.dg-title').allTextContents();
+    expect(titles.length === 9, `got ${titles.length} checks: ${titles.join(', ')}`);
+    expect(titles.includes('Gesture recognition') && titles.includes('Rendering performance'), titles.join(', '));
+  });
+
   await check('Desktop app at / still renders', async () => {
     const desk = await ctx.newPage();
     await desk.setViewportSize({ width: 1280, height: 800 });
