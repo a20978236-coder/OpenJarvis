@@ -103,6 +103,15 @@ function fakeServer(state) {
       const m = url.searchParams.get('model') || '';
       return route.fulfill(json({ model: m, engine_accepts: true, model_sees: m === 'smoke-vision', vision_models: ['smoke-vision'], hint: 'ollama pull qwen2.5vl:7b' }));
     }
+    if (p === '/v1/hell/files' && req.method() === 'POST') {
+      state.files.push({ id: 'a'.repeat(32), name: 'notes.txt', size: 5, type: 'text/plain', created_at: 1, in_memory: false, memory_chunks: 0, can_add_to_memory: true });
+      return route.fulfill(json(state.files[state.files.length - 1], 201));
+    }
+    if (p === '/v1/hell/files') return route.fulfill(json({ files: state.files, total_bytes: 5 * state.files.length, max_file_bytes: 26214400 }));
+    if (p.endsWith('/memory') && p.startsWith('/v1/hell/files/')) {
+      state.files = state.files.map((f) => ({ ...f, in_memory: true, memory_chunks: 1 }));
+      return route.fulfill(json({ ...state.files[0], secrets_removed: 0 }));
+    }
     if (p === '/v1/agents') return route.fulfill(json({ registered: ['simple'], running: [] }));
     if (p === '/v1/skills') return route.fulfill(json({ skills: [] }));
     if (p === '/v1/chat/completions') {
@@ -169,7 +178,7 @@ async function newPage(state, opts = IPHONE_12_APP) {
   await page.route('**/*', fakeServer(state));
   return { ctx, page, errors };
 }
-const freshState = () => ({ authRequired: false, tasks: [], saved: null, aiCalls: 0, speech: false, heard: '', visionFrames: [], synth: [] });
+const freshState = () => ({ authRequired: false, tasks: [], saved: null, aiCalls: 0, speech: false, heard: '', visionFrames: [], synth: [], files: [] });
 
 console.log(`HELL smoke test — ${base}\n`);
 
@@ -389,6 +398,18 @@ console.log(`HELL smoke test — ${base}\n`);
     const titles = await page.locator('.dg-title').allTextContents();
     expect(titles.length === 9, `got ${titles.length} checks: ${titles.join(', ')}`);
     expect(titles.includes('Gesture recognition') && titles.includes('Rendering performance'), titles.join(', '));
+  });
+
+  await check('Files: send a file, add it to memory; Apps: add a Shortcuts button', async () => {
+    await page.goto(`${base}/m/files`, { waitUntil: 'networkidle' });
+    await page.locator('#files-pick').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+    await page.getByText('File sent to HELL').waitFor({ timeout: 8000 });
+    await page.getByRole('button', { name: 'Add to memory' }).click();
+    await page.getByText('In memory').waitFor({ timeout: 8000 });
+    await page.goto(`${base}/m/apps`, { waitUntil: 'networkidle' });
+    await page.getByLabel(/Shortcut name/).fill('Lights Off');
+    await page.getByRole('button', { name: 'Add button' }).click();
+    await page.getByRole('button', { name: 'Run shortcut Lights Off' }).waitFor({ timeout: 5000 });
   });
 
   await check('Desktop app at / still renders', async () => {

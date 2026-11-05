@@ -52,3 +52,14 @@ def test_personal_details_need_approval(text):
 )
 def test_ordinary_facts_pass(text):
     assert classify(text)[0] is None
+
+
+def test_redact_keeps_the_rest_of_the_text():
+    from openjarvis.memory.sensitive import REDACTED, redact
+
+    text = "Wifi password: blue-falcon. Card 4111 1111 1111 1111. Order 1234 5678 9012 3456. Buy milk."
+    out, n = redact(text)
+    assert n == 2
+    assert "blue-falcon" not in out and "4111" not in out
+    assert "Order 1234 5678 9012 3456" in out and "Buy milk." in out
+    assert out.count(REDACTED) == 2

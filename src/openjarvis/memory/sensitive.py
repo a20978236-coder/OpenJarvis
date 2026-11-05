@@ -85,4 +85,32 @@ def classify(text: str) -> Tuple[Optional[str], str]:
     return None, ""
 
 
-__all__ = ["SECRET", "PERSONAL", "classify"]
+REDACTED = "[secret removed]"
+
+
+def redact(text: str) -> Tuple[str, int]:
+    """Replace every secret in *text* with a placeholder; return (text, count)."""
+    count = 0
+    out = text or ""
+
+    def sub(_m: "re.Match[str]") -> str:
+        nonlocal count
+        count += 1
+        return REDACTED
+
+    for _reason, pat in _SECRET_PATTERNS:
+        out = pat.sub(sub, out)
+
+    def card(m: "re.Match[str]") -> str:
+        nonlocal count
+        digits = re.sub(r"\D", "", m.group(0))
+        if 13 <= len(digits) <= 19 and _luhn_ok(digits):
+            count += 1
+            return REDACTED
+        return m.group(0)
+
+    out = _CARD_CANDIDATE.sub(card, out)
+    return out, count
+
+
+__all__ = ["SECRET", "PERSONAL", "REDACTED", "classify", "redact"]

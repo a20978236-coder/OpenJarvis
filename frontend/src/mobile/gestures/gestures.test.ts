@@ -233,7 +233,8 @@ describe('module order for swipes', () => {
   it('starts at HELL and lists only working modules', () => {
     const list = carousel();
     expect(list[0]).toMatchObject({ id: 'home', route: '/m' });
-    expect(list.map((e) => e.id)).not.toContain('apps');
+    expect(list.map((e) => e.id)).toContain('apps');
+    expect(list.length).toBe(13); // HELL + all 12 modules
     expect(list.map((e) => e.id)).toContain('calibration');
     expect(list.map((e) => e.id)).toContain('gestures');
   });

@@ -28,6 +28,8 @@ import { GesturesScreen } from './mobile/gestures/GesturesScreen';
 import { CalibrationScreen } from './mobile/gestures/CalibrationScreen';
 import { VoiceSettings } from './mobile/voice/VoiceSettings';
 import { DiagnosticsScreen } from './mobile/diagnostics/DiagnosticsScreen';
+import { AppsScreen } from './mobile/apps/AppsScreen';
+import { FilesScreen } from './mobile/apps/FilesScreen';
 import { MobileChat } from './mobile/pages/MobileChat';
 import { MobileMemory } from './mobile/pages/MobileMemory';
 import { MobileTasks } from './mobile/pages/MobileTasks';
@@ -212,6 +214,8 @@ export default function App() {
           <Route path="calibration" element={<CalibrationScreen />} />
           <Route path="voice" element={<VoiceSettings />} />
           <Route path="diagnostics" element={<DiagnosticsScreen />} />
+          <Route path="apps" element={<AppsScreen />} />
+          <Route path="files" element={<FilesScreen />} />
           <Route path="module/:id" element={<ModuleScreen />} />
         </Route>
         <Route element={<Layout />}>

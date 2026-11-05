@@ -14,6 +14,7 @@ import { createVad } from '../lib/vad';
 import { startWakeListener } from '../lib/device-speech';
 import { useVoicePrefs } from '../lib/voice-prefs';
 import { installErrorLog } from '../lib/error-log';
+import { matchShortcutCommand, runShortcut, useShortcuts } from './apps/shortcuts';
 import { useChatSender } from '../hooks/useChatSender';
 import { useAutoSpeakReplies } from '../hooks/useAutoSpeakReplies';
 import { deriveOrbState } from './orb-state';
@@ -274,6 +275,14 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
   /** Send what was heard: builder commands go to the builder, the rest to chat. */
   const deliver = useCallback(
     async (text: string) => {
+      // "Run shortcut Lights off": only shortcuts you added in Apps.
+      const sc = matchShortcutCommand(text, useShortcuts.getState().buttons);
+      if (sc) {
+        voiceTurn.current = 'idle';
+        toast(`Running shortcut “${sc.label}”`);
+        runShortcut(sc);
+        return;
+      }
       if (isBuilderCommand(text)) {
         voiceTurn.current = 'idle';
         navigate('/m/hologram', { state: { command: text } });
