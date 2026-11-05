@@ -5,7 +5,7 @@ import { isEmbedOnlyModel } from '../../lib/model-capabilities';
 import { useChatSender } from '../../hooks/useChatSender';
 import { MessageBubble } from '../../components/Chat/MessageBubble';
 import { StreamingDots } from '../../components/Chat/StreamingDots';
-import { JarvisOrb } from '../JarvisOrb';
+import { HellOrb } from '../HellOrb';
 import { useMobile } from '../MobileShell';
 
 export function MobileChat() {
@@ -93,7 +93,7 @@ export function MobileChat() {
       <div ref={listRef} onScroll={onScroll} className="jm-scroll" style={{ padding: 0 }} data-selectable>
         {empty ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 32, gap: 6 }}>
-            <JarvisOrb state={orbState} size={150} />
+            <HellOrb state={orbState} size={150} />
             <p style={{ color: 'var(--jm-text-2)', fontSize: 15, textAlign: 'center', padding: '0 24px' }}>
               {speechAvailable ? 'Ask anything — type below or tap the mic.' : 'Ask anything.'}
             </p>

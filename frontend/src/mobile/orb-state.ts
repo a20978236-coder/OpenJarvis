@@ -1,4 +1,4 @@
-import type { OrbState } from './JarvisOrb';
+import type { OrbState } from './orb-types';
 import type { SpeechState } from '../hooks/useSpeech';
 import type { TtsState } from '../lib/tts';
 

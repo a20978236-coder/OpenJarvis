@@ -365,3 +365,57 @@
   letter-spacing: 0.5em;
   color: var(--jm-cyan);
 }
+
+/* ---- Particle orb ------------------------------------------------------ */
+
+.hell-orb {
+  -webkit-touch-callout: none;
+  outline-offset: 6px;
+}
+
+/* ---- Bottom sheet ------------------------------------------------------ */
+
+.hell-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(2, 6, 18, 0.45);
+  animation: hell-fade 0.18s ease-out;
+}
+.hell-sheet {
+  width: 100%;
+  max-height: 78%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 18px calc(env(safe-area-inset-bottom) + 18px);
+  border-radius: 22px 22px 0 0;
+  background: rgba(6, 16, 38, 0.94);
+  border-bottom: none;
+  animation: hell-rise 0.24s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes hell-fade { from { opacity: 0; } }
+@keyframes hell-rise { from { transform: translateY(40px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .hell-sheet, .hell-sheet-backdrop { animation: none; }
+}
+
+.hell-range {
+  width: 100%;
+  height: 28px;
+  accent-color: var(--jm-blue);
+}
+.hell-switch {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--jm-blue);
+  flex-shrink: 0;
+}
+.hell-choice[aria-checked='true'] {
+  color: var(--jm-cyan);
+  border-color: var(--jm-border-strong);
+  background: rgba(0, 179, 255, 0.12);
+}

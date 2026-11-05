@@ -5,7 +5,7 @@ import { useAppStore } from '../../lib/store';
 import { getMemoryStats } from '../../lib/api';
 import { getPersonalSummary, type PersonalSummary } from '../../lib/personal-api';
 import { useChatSender } from '../../hooks/useChatSender';
-import { JarvisOrb } from '../JarvisOrb';
+import { HellOrb } from '../HellOrb';
 import { useMobile } from '../MobileShell';
 
 function greeting(now = new Date()): string {
@@ -25,7 +25,7 @@ const QUICK_PROMPTS = [
 
 export function MobileHome() {
   const navigate = useNavigate();
-  const { orbState, toggleTalk, speechAvailable, online, authVia, signOut } = useMobile();
+  const { orbState, toggleTalk, speechAvailable, online, authVia, signOut, activate, openOrbSettings } = useMobile();
   const { send } = useChatSender();
   const selectedModel = useAppStore((s) => s.selectedModel);
   const modelsLoading = useAppStore((s) => s.modelsLoading);
@@ -36,10 +36,13 @@ export function MobileHome() {
   useEffect(() => {
     if (!online) return;
     getMemoryStats()
-      .then((s) => setMemoryCount(s.entries))
+      // Server data is untrusted: a malformed reply must not crash Home.
+      .then((s) => setMemoryCount(Number.isFinite(s?.entries) ? s.entries : null))
       .catch(() => setMemoryCount(null));
     getPersonalSummary()
-      .then(setSummary)
+      .then((s) =>
+        setSummary(Number.isFinite(s?.open_tasks) && Number.isFinite(s?.due_today) ? s : null),
+      )
       .catch(() => setSummary(null));
   }, [online]);
 
@@ -60,12 +63,15 @@ export function MobileHome() {
       </section>
 
       <section style={{ display: 'flex', justifyContent: 'center' }}>
-        <JarvisOrb
+        <HellOrb
           state={orbState}
-          size={232}
-          onPress={canTalk ? toggleTalk : () => navigate('/m/chat')}
-          label={canTalk ? undefined : 'Open chat'}
-          caption={!canTalk && orbState === 'idle' ? 'Tap to chat' : undefined}
+          size={240}
+          showBase
+          // Tap: activation burst (or send, while listening). Double-tap: talk.
+          onTap={() => (orbState === 'listening' ? void toggleTalk() : activate())}
+          onDoubleTap={canTalk ? () => void toggleTalk() : () => navigate('/m/chat')}
+          onLongPress={openOrbSettings}
+          caption={!canTalk && orbState === 'idle' ? 'Double-tap to chat' : undefined}
         />
       </section>
       {!speechAvailable && online && (

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Lock } from 'lucide-react';
 import { signIn, SignInError } from '../lib/session-api';
-import { JarvisOrb } from './JarvisOrb';
+import { HellOrb } from './HellOrb';
 import './mobile.css';
 import { HellWordmark } from './HellWordmark';
 
@@ -62,7 +62,7 @@ export function MobileSignIn({ onSignedIn }: { onSignedIn: () => void | Promise<
       </header>
       <main className="jm-main" style={{ justifyContent: 'center', padding: '0 24px 48px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-          <JarvisOrb state={busy ? 'thinking' : 'idle'} size={170} showCaption={false} label="HELL" />
+          <HellOrb state={busy ? 'thinking' : 'idle'} size={170} showCaption={false} label="HELL" />
           <div style={{ textAlign: 'center' }}>
             <h1 style={{ fontSize: 24, fontWeight: 600 }}>Welcome back</h1>
             <p style={{ fontSize: 15, color: 'var(--jm-text-2)', marginTop: 4 }}>Enter your passcode to unlock HELL.</p>

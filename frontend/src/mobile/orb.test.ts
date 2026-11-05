@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveOrbState, type OrbInputs } from './orb-state';
-import { drawOrb, ORB_CAPTIONS } from './JarvisOrb';
+import { drawOrb, ORB_CAPTIONS } from './CanvasOrb';
 
 const base: OrbInputs = { online: true, speech: 'idle', isStreaming: false, streamContent: '', tts: 'idle' };
 

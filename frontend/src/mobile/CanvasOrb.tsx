@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-export type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'offline';
+import type { OrbState } from './orb-types';
+export type { OrbState } from './orb-types';
 
 /** Visual parameters per state; the animation eases between them. */
 interface Profile {
@@ -16,15 +17,13 @@ const PROFILES: Record<OrbState, Profile> = {
   thinking: { energy: 0.65, spin: 2.2, hue: [96, 132, 255], wave: 0.15 },
   speaking: { energy: 1, spin: 0.9, hue: [0, 200, 255], wave: 0.55 },
   offline: { energy: 0.12, spin: 0.08, hue: [70, 90, 130], wave: 0 },
+  vision: { energy: 0.7, spin: 0.5, hue: [60, 255, 220], wave: 0.3 },
+  error: { energy: 0.8, spin: 0.4, hue: [255, 60, 80], wave: 0.2 },
+  activating: { energy: 1, spin: 1.4, hue: [140, 235, 255], wave: 0.6 },
 };
 
-export const ORB_CAPTIONS: Record<OrbState, string> = {
-  idle: 'Tap to talk',
-  listening: 'Listening… tap to send',
-  thinking: 'Thinking…',
-  speaking: 'Speaking…',
-  offline: 'Offline',
-};
+export { ORB_CAPTIONS } from './orb-types';
+import { ORB_CAPTIONS } from './orb-types';
 
 interface Particle {
   r: number; // orbit radius factor
@@ -220,7 +219,7 @@ function prefersReducedMotion(): boolean {
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-interface JarvisOrbProps {
+interface CanvasOrbProps {
   state: OrbState;
   size?: number;
   onPress?: () => void;
@@ -232,7 +231,8 @@ interface JarvisOrbProps {
   caption?: string;
 }
 
-export function JarvisOrb({ state, size = 240, onPress, disabled, label, showCaption = true, caption: captionOverride }: JarvisOrbProps) {
+/** 2D canvas orb: the fallback when WebGL is unavailable, and the placeholder while the 3D orb loads. */
+export function CanvasOrb({ state, size = 240, onPress, disabled, label, showCaption = true, caption: captionOverride }: CanvasOrbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state;

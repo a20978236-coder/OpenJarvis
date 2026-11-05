@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { Brain, CheckSquare, Home, MessageCircle, Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,10 +10,12 @@ import { useSpeech, type SpeechState } from '../hooks/useSpeech';
 import { useChatSender } from '../hooks/useChatSender';
 import { useAutoSpeakReplies } from '../hooks/useAutoSpeakReplies';
 import { deriveOrbState } from './orb-state';
-import { JarvisOrb, type OrbState } from './JarvisOrb';
+import type { OrbState } from './orb-types';
 import { MobileSignIn } from './MobileSignIn';
 import './mobile.css';
 import { HellWordmark } from './HellWordmark';
+import { OrbCustomizer } from './OrbCustomizer';
+import { HellOrb } from './HellOrb';
 
 /**
  * One voice pipeline for the whole mobile app: the orb on Home and the mic in
@@ -31,6 +33,12 @@ interface MobileContextValue {
   listen: () => Promise<void>;
   /** Stop a recording and return the transcript without sending it. */
   dictate: () => Promise<string | null>;
+  /** Scatter-and-reform burst: "HELL online". */
+  activate: () => void;
+  /** Flash the orb red briefly. */
+  flashError: () => void;
+  /** Open the orb appearance sheet (long-press on the orb). */
+  openOrbSettings: () => void;
   /** How this browser is signed in: a session cookie, an API key, or not needed. */
   authVia: 'cookie' | 'bearer' | null;
   signOut: () => Promise<void>;
@@ -120,7 +128,7 @@ export function MobileShell() {
   if (auth === 'checking') {
     return (
       <div className="jm" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <JarvisOrb state="thinking" size={140} showCaption={false} label="Connecting" />
+        <HellOrb state="thinking" size={140} showCaption={false} label="Connecting" />
       </div>
     );
   }
@@ -170,9 +178,27 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
     };
   }, []);
 
+  // Short-lived orb states layered over the derived one.
+  const [transient, setTransient] = useState<OrbState | null>(null);
+  const transientTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flash = useCallback((s: OrbState, ms: number) => {
+    if (transientTimer.current) clearTimeout(transientTimer.current);
+    setTransient(s);
+    transientTimer.current = setTimeout(() => setTransient(null), ms);
+  }, []);
+  useEffect(() => () => {
+    if (transientTimer.current) clearTimeout(transientTimer.current);
+  }, []);
+  const activate = useCallback(() => flash('activating', 1100), [flash]);
+  const flashError = useCallback(() => flash('error', 1600), [flash]);
+  const [orbSettingsOpen, setOrbSettingsOpen] = useState(false);
+  const openOrbSettings = useCallback(() => setOrbSettingsOpen(true), []);
+
   useEffect(() => {
-    if (speech.error) toast.error(speech.error);
-  }, [speech.error]);
+    if (!speech.error) return;
+    toast.error(speech.error);
+    flashError();
+  }, [speech.error, flashError]);
 
   const dictate = useCallback(async () => {
     try {
@@ -201,18 +227,20 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
       await send(text);
       return;
     }
-    // Interrupt Jarvis if it is mid-sentence, like a real conversation.
+    // Interrupt HELL if it is mid-sentence, like a real conversation.
     useTtsStore.getState().stop();
     await speech.startRecording();
   }, [speech, dictate, navigate, send]);
 
-  const orbState = deriveOrbState({
+  const derived = deriveOrbState({
     online,
     speech: speech.state,
     isStreaming,
     streamContent,
     tts: ttsState,
   });
+  // Listening always shows, so the user knows the mic is live.
+  const orbState: OrbState = transient && derived !== 'listening' ? transient : derived;
 
   const value = useMemo<MobileContextValue>(
     () => ({
@@ -223,10 +251,13 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
       toggleTalk,
       listen,
       dictate,
+      activate,
+      flashError,
+      openOrbSettings,
       authVia,
       signOut,
     }),
-    [online, orbState, speech.state, speech.available, toggleTalk, listen, dictate, authVia, signOut],
+    [online, orbState, speech.state, speech.available, toggleTalk, listen, dictate, activate, flashError, openOrbSettings, authVia, signOut],
   );
 
   const toggleVoiceOut = () => {
@@ -271,6 +302,7 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
             </NavLink>
           ))}
         </nav>
+        {orbSettingsOpen && <OrbCustomizer onClose={() => setOrbSettingsOpen(false)} />}
       </div>
     </MobileContext.Provider>
   );
