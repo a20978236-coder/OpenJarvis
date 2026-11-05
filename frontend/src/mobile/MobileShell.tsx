@@ -16,6 +16,7 @@ import './mobile.css';
 import { HellWordmark } from './HellWordmark';
 import { OrbCustomizer } from './OrbCustomizer';
 import { isBuilderCommand } from './hologram/holo-commands';
+import { useCamera } from './vision/camera';
 import { HellOrb } from './HellOrb';
 
 /**
@@ -142,7 +143,7 @@ export function MobileShell() {
 function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; signOut: () => Promise<void> }) {
   const navigate = useNavigate();
   // The dashboard and the Hologram Builder are full-screen with their own controls.
-  const onDashboard = /^\/m\/?$|^\/m\/hologram\/?$/.test(useLocation().pathname);
+  const onDashboard = /^\/m\/?$|^\/m\/(hologram|vision)\/?$/.test(useLocation().pathname);
   const [online, setOnline] = useState<boolean | null>(null);
   const [serverLatencyMs, setLatency] = useState<number | null>(null);
   const updateSettings = useAppStore((s) => s.updateSettings);
@@ -262,8 +263,11 @@ function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; 
     streamContent,
     tts: ttsState,
   });
-  // Listening always shows, so the user knows the mic is live.
-  const orbState: OrbState = transient && derived !== 'listening' ? transient : derived;
+  // Listening always shows, so the user knows the mic is live; a camera
+  // frame being analysed shows the vision scan.
+  const visionBusy = useCamera((s) => s.analyzing);
+  const base: OrbState = visionBusy && derived !== 'listening' ? 'vision' : derived;
+  const orbState: OrbState = transient && base !== 'listening' ? transient : base;
 
   const value = useMemo<MobileContextValue>(
     () => ({

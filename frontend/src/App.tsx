@@ -23,6 +23,7 @@ import { ModuleScreen } from './mobile/pages/ModuleScreen';
 import { MobileSettings } from './mobile/pages/MobileSettings';
 import { AiModules } from './mobile/pages/AiModules';
 import { HologramBuilder } from './mobile/hologram/HologramBuilder';
+import { VisionScreen } from './mobile/vision/VisionScreen';
 import { MobileChat } from './mobile/pages/MobileChat';
 import { MobileMemory } from './mobile/pages/MobileMemory';
 import { MobileTasks } from './mobile/pages/MobileTasks';
@@ -202,6 +203,7 @@ export default function App() {
           <Route path="settings" element={<MobileSettings />} />
           <Route path="ai" element={<AiModules />} />
           <Route path="hologram" element={<HologramBuilder />} />
+          <Route path="vision" element={<VisionScreen />} />
           <Route path="module/:id" element={<ModuleScreen />} />
         </Route>
         <Route element={<Layout />}>

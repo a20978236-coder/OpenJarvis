@@ -225,14 +225,6 @@
   text-transform: capitalize;
   font-size: 13.5px;
 }
-.holo-toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  font-size: 15px;
-  cursor: pointer;
-}
 .holo-swatches {
   display: flex;
   flex-wrap: wrap;
@@ -342,27 +334,6 @@
 }
 
 /* ---- Ask HELL ----------------------------------------------------------- */
-.holo-chips {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-  touch-action: pan-x;
-}
-.holo-chip {
-  flex: none;
-  min-height: 36px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid var(--jm-border);
-  background: rgba(0, 179, 255, 0.08);
-  color: var(--jm-text);
-  font-size: 13px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.holo-chip:disabled { opacity: 0.5; }
 .holo-log {
   display: flex;
   flex-direction: column;

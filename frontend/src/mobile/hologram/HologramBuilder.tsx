@@ -43,6 +43,7 @@ import { CATALOG, HOLO_TYPES, LIMITS, SWATCHES, VARIANTS, type HoloObject, type 
 import { deleteHologram, listHolograms, loadHologram, type HologramSummary } from './holo-api';
 import { saveCurrentHologram } from './holo-runner';
 import { CommandSheet } from './CommandSheet';
+import { useCamera } from '../vision/camera';
 import './hologram.css';
 
 // The 3D scene (three.js + React Three Fiber) loads on demand.
@@ -183,6 +184,8 @@ function Inspector({ obj, onClose }: { obj: HoloObject; onClose: () => void }) {
         </div>
       )}
 
+      {obj.type === 'camera' && <CameraToggle />}
+
       <h3 className="jm-label">Position</h3>
       <Range label="Left / right" value={obj.position[0]} min={-LIMITS.position} max={LIMITS.position} step={0.05} onLive={pos(0)} onCommit={ed.commit} format={num} />
       <Range label="Down / up" value={obj.position[1]} min={-LIMITS.position} max={LIMITS.position} step={0.05} onLive={pos(1)} onCommit={ed.commit} format={num} />
@@ -232,6 +235,29 @@ function Inspector({ obj, onClose }: { obj: HoloObject; onClose: () => void }) {
         </>
       )}
     </Sheet>
+  );
+}
+
+/** Live feed for camera displays. Only starts on this explicit tap. */
+function CameraToggle() {
+  const status = useCamera((s) => s.status);
+  const error = useCamera((s) => s.error);
+  const on = status === 'on';
+  return (
+    <div className="holo-field">
+      <label className="holo-toggle">
+        <input
+          type="checkbox"
+          className="hell-switch"
+          checked={on || status === 'starting'}
+          disabled={status === 'starting'}
+          onChange={(e) => (e.target.checked ? void useCamera.getState().start() : useCamera.getState().stop())}
+        />
+        <span>Live camera {on ? 'on' : status === 'starting' ? 'starting…' : 'off'}</span>
+      </label>
+      {status === 'error' && error && <p className="holo-note" role="alert">{error}</p>}
+      <p className="holo-note">Shown only on this phone. Nothing is recorded or sent.</p>
+    </div>
   );
 }
 
@@ -442,6 +468,12 @@ export function HologramBuilder() {
   const incoming = (location.state as { command?: string } | null)?.command;
   const [pendingCommand, setPendingCommand] = useState<string | undefined>(incoming);
   const [sheet, setSheet] = useState<SheetKind>(incoming ? 'ask' : null);
+  // Camera off when leaving the builder (privacy + battery).
+  useEffect(() => () => useCamera.getState().stop(), []);
+  const hasCameraDisplay = layout.objects.some((o) => o.type === 'camera');
+  useEffect(() => {
+    if (!hasCameraDisplay && useCamera.getState().status !== 'off') useCamera.getState().stop();
+  }, [hasCameraDisplay]);
   useEffect(() => {
     if (incoming) navigate(location.pathname, { replace: true, state: null });
   }, [incoming]); // eslint-disable-line react-hooks/exhaustive-deps

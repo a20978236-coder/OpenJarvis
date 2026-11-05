@@ -53,7 +53,7 @@ function fakeServer(state) {
       return route.fulfill(json({ auth_required: state.authRequired, authenticated: !state.authRequired, via: state.authRequired ? null : 'cookie' }));
     }
     if (state.authRequired && p.startsWith('/v1/')) return route.fulfill(json({ detail: 'Missing Authorization header' }, 401));
-    if (p === '/v1/models') return route.fulfill(json({ data: [{ id: 'smoke-model', owned_by: 'ollama' }] }));
+    if (p === '/v1/models') return route.fulfill(json({ data: [{ id: 'smoke-model', owned_by: 'ollama' }, { id: 'smoke-vision', owned_by: 'ollama' }] }));
     if (p === '/v1/info') return route.fulfill(json({ model: 'smoke-model', agent: null, engine: 'ollama' }));
     if (p === '/v1/speech/health') return route.fulfill(json({ available: state.speech }));
     if (p === '/v1/speech/transcribe') return route.fulfill(json({ text: state.heard, language: 'en', confidence: 1, duration_seconds: 1 }));
@@ -78,6 +78,10 @@ function fakeServer(state) {
       }
       return route.fulfill(json({ holograms: state.saved ? [{ id: 'h1', name: state.saved.name, objects: state.saved.data.objects.length, created_at: 0, updated_at: 0 }] : [] }));
     }
+    if (p === '/v1/hell/vision') {
+      const m = url.searchParams.get('model') || '';
+      return route.fulfill(json({ model: m, engine_accepts: true, model_sees: m === 'smoke-vision', vision_models: ['smoke-vision'], hint: 'ollama pull qwen2.5vl:7b' }));
+    }
     if (p === '/v1/agents') return route.fulfill(json({ registered: ['simple'], running: [] }));
     if (p === '/v1/skills') return route.fulfill(json({ skills: [] }));
     if (p === '/v1/chat/completions') {
@@ -86,6 +90,12 @@ function fakeServer(state) {
         // Hologram AI fallback: answer with editor operations.
         state.aiCalls++;
         return route.fulfill(json({ choices: [{ message: { content: '<think>plan</think>{"ops":[{"op":"add","type":"rotating","props":{"variant":"crystal","color":"gold"}}],"reply":"Added a golden crystal."}' } }] }));
+      }
+      const parts = Array.isArray(body.messages?.at(-1)?.content) ? body.messages.at(-1).content : [];
+      const frames = parts.filter((c) => c.type === 'image_url').length;
+      if (frames) {
+        state.visionFrames.push(frames);
+        return route.fulfill(sse('A green test card.'));
       }
       return route.fulfill(sse('Systems online.'));
     }
@@ -137,12 +147,13 @@ async function newPage(state, opts = IPHONE_12_APP) {
   await page.route('**/*', fakeServer(state));
   return { ctx, page, errors };
 }
-const freshState = () => ({ authRequired: false, tasks: [], saved: null, aiCalls: 0, speech: false, heard: '' });
+const freshState = () => ({ authRequired: false, tasks: [], saved: null, aiCalls: 0, speech: false, heard: '', visionFrames: [] });
 
 console.log(`HELL smoke test — ${base}\n`);
 
 {
-  const { ctx, page, errors } = await newPage(freshState());
+  const state = freshState();
+  const { ctx, page, errors } = await newPage(state);
 
   await check('Dashboard renders HELL with all 12 modules and the orb', async () => {
     await page.goto(`${base}/m`, { waitUntil: 'networkidle' });
@@ -249,6 +260,23 @@ console.log(`HELL smoke test — ${base}\n`);
     await page.getByLabel('What should HELL build?').fill('save this layout as Smoke deck');
     await page.getByRole('button', { name: 'Run command' }).click();
     await page.getByText('Saved “Smoke deck”.').waitFor({ timeout: 8000 });
+  });
+
+  await check('Vision: camera only on tap, one frame per question, camera-off works', async () => {
+    await ctx.grantPermissions(['camera'], { origin: base });
+    await page.goto(`${base}/m/vision`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Turn camera on' }).waitFor({ timeout: 8000 });
+    expect((await page.locator('video').evaluate((v) => v.srcObject)) === null, 'camera started without a tap');
+    await page.getByRole('button', { name: 'Turn camera on' }).click();
+    await page.getByRole('button', { name: 'Turn camera off' }).waitFor({ timeout: 8000 });
+    await page.waitForFunction(() => document.querySelector('video')?.videoWidth > 0, null, { timeout: 8000 });
+    expect(state.visionFrames.length === 0, 'frames were sent before asking');
+    await page.getByRole('button', { name: 'What am I looking at?' }).click();
+    await page.getByText('A green test card.').waitFor({ timeout: 8000 });
+    expect(JSON.stringify(state.visionFrames) === '[1]', `expected one frame, got ${JSON.stringify(state.visionFrames)}`);
+    await page.getByRole('button', { name: 'Turn camera off' }).click();
+    await page.getByRole('button', { name: 'Turn camera on' }).waitFor();
+    expect((await page.locator('video').evaluate((v) => v.srcObject)) === null, 'stream not released');
   });
 
   await check('Desktop app at / still renders', async () => {

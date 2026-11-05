@@ -20,6 +20,7 @@ import {
   type ShaderMaterial as ThreeShaderMaterial,
 } from 'three';
 import { useMobile } from '../MobileShell';
+import { useCamera } from '../vision/camera';
 import { getMemoryStats } from '../../lib/api';
 import { fetchWeather, useWeatherPrefs, type Weather } from '../../lib/weather-api';
 import type { HoloObject, HoloType, PanelShape } from './holo-types';
@@ -107,7 +108,7 @@ function outlineGeometry(shape: PanelShape, w: number, h: number): BufferGeometr
 type Draw = (p: PanelCanvas, t: number, obj: HoloObject) => void;
 
 /** A glowing panel whose face is drawn by `draw`, refreshed `fps` times a second (0 = only on change). */
-function Panel({ obj, w, h, light, draw, fps }: { obj: HoloObject; w: number; h: number; light: number; draw: Draw; fps: number }) {
+function Panel({ obj, w, h, light, draw, fps, always }: { obj: HoloObject; w: number; h: number; light: number; draw: Draw; fps: number; always?: boolean }) {
   const pc = useMemo(() => createPanelCanvas(w / h), [w, h]);
   const geo = useMemo(() => panelGeometry(obj.shape, w, h), [obj.shape, w, h]);
   const outline = useMemo(() => outlineGeometry(obj.shape, w, h), [obj.shape, w, h]);
@@ -130,7 +131,7 @@ function Panel({ obj, w, h, light, draw, fps }: { obj: HoloObject; w: number; h:
   }, [pc, obj]);
 
   useFrame(({ clock }) => {
-    if (fps <= 0 || obj.animSpeed === 0) return;
+    if (fps <= 0 || (obj.animSpeed === 0 && !always)) return;
     const now = clock.elapsedTime;
     if (now - last.current < 1 / fps) return;
     last.current = now;
@@ -215,9 +216,71 @@ const drawCamera: Draw = (p, t, o) => {
   ctx.fillText((o.text || 'Camera').toUpperCase() + ' · OFF', W / 2, H * 0.42);
   ctx.font = `500 ${Math.round(H * 0.075)}px ${FONT}`;
   ctx.fillStyle = 'rgba(200,225,250,0.75)';
-  ctx.fillText('Live view arrives with Vision (Stage D)', W / 2, H * 0.6);
+  ctx.fillText('Turn the camera on in Edit', W / 2, H * 0.6);
   ctx.textAlign = 'left';
 };
+
+/** Live feed: the video frame drawn into the panel (cover-fit), plus the corner marks. */
+function makeDrawCameraLive(get: () => { video: HTMLVideoElement | null; mirror: boolean }): Draw {
+  return (p, t, o) => {
+    const { video, mirror } = get();
+    if (!video || !video.videoWidth) return drawCamera(p, t, o);
+    const { ctx, W, H } = p;
+    ctx.clearRect(0, 0, W, H);
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const k = Math.max(W / vw, H / vh);
+    const dw = vw * k;
+    const dh = vh * k;
+    ctx.save();
+    if (mirror) {
+      ctx.translate(W, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.globalAlpha = 0.92;
+    ctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    ctx.restore();
+    // Holographic tint + scanlines so it still reads as part of the scene.
+    ctx.fillStyle = rgba(o.color, 0.12);
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1);
+    ctx.fillStyle = '#ff4d6a';
+    ctx.beginPath();
+    ctx.arc(W * 0.06, H * 0.1, H * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = `700 ${Math.round(H * 0.07)}px ${FONT}`;
+    ctx.fillStyle = '#e6f6ff';
+    ctx.fillText('LIVE', W * 0.1, H * 0.125);
+  };
+}
+
+function CameraPanel({ obj, light, w, h }: { obj: HoloObject; light: number; w: number; h: number }) {
+  const stream = useCamera((s) => s.stream);
+  const facing = useCamera((s) => s.facing);
+  const live = useRef<{ video: HTMLVideoElement | null; mirror: boolean }>({ video: null, mirror: false });
+  live.current.mirror = facing === 'user';
+  useEffect(() => {
+    if (!stream) {
+      live.current.video = null;
+      return;
+    }
+    const v = document.createElement('video');
+    v.muted = true;
+    v.playsInline = true;
+    v.setAttribute('playsinline', '');
+    v.srcObject = stream;
+    void v.play().catch(() => undefined);
+    live.current.video = v;
+    return () => {
+      v.pause();
+      v.srcObject = null;
+      if (live.current.video === v) live.current.video = null;
+    };
+  }, [stream]);
+  const draw = useMemo(() => makeDrawCameraLive(() => live.current), []);
+  return <Panel obj={obj} w={w} h={h} light={light} draw={draw} fps={stream ? 15 : 2} always={!!stream} />;
+}
 
 function makeDrawWeather(get: () => { w: Weather | null; status: string }): Draw {
   return (p, t, o) => {
@@ -746,7 +809,7 @@ export function HoloVisual({ obj, light, objectCount }: { obj: HoloObject; light
     case 'panel':
       return <Panel obj={obj} w={w} h={h} light={light} draw={drawControl} fps={4} />;
     case 'camera':
-      return <Panel obj={obj} w={w} h={h} light={light} draw={drawCamera} fps={2} />;
+      return <CameraPanel obj={obj} light={light} w={w} h={h} />;
     case 'weather':
       return <WeatherPanel obj={obj} light={light} w={w} h={h} />;
     case 'clock':

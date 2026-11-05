@@ -310,7 +310,7 @@ export function HoloDashboard() {
         >
           {recording ? <Square size={26} fill="currentColor" aria-hidden="true" /> : <Mic size={30} aria-hidden="true" />}
         </button>
-        <button type="button" className="hd-dock-btn hd-chamfer" onClick={() => navigate('/m/module/vision')} aria-label="Vision camera — coming in stage D">
+        <button type="button" className="hd-dock-btn hd-chamfer" onClick={() => navigate('/m/vision')} aria-label="Vision camera">
           <span className="hd-chamfer-in" aria-hidden="true" />
           <Camera size={24} aria-hidden="true" />
         </button>
