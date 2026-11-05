@@ -214,6 +214,8 @@ async def chat_completions(request_body: ChatCompletionRequest, request: Request
     if (
         config is not None
         and config.agent.context_from_memory
+        # Memory can be switched off from HELL's memory settings.
+        and getattr(request.app.state, "memory_use_in_replies", True)
         and request_body.messages
     ):
         try:

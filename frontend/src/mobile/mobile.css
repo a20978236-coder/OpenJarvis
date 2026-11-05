@@ -487,3 +487,22 @@
 @media (prefers-reduced-motion: reduce) {
   .jm-gesture-hud > span { animation: none; }
 }
+
+/* ---- Memory (Stage I) ------------------------------------------------------ */
+.mem-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.mem-row { display: flex; align-items: center; gap: 6px; padding: 10px 6px 10px 14px; border-radius: 14px; }
+.mem-row[data-pending] { border-color: rgba(92, 225, 255, 0.55); }
+.mem-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; font-size: 15px; line-height: 1.4; word-break: break-word; }
+.mem-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; font-size: 12px; color: var(--jm-text-3); }
+.mem-flag { display: inline-flex; align-items: center; gap: 4px; color: #ffb547; }
+.mem-snippet { display: block; margin-top: 3px; font-size: 13px; color: var(--jm-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mem-approve { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; border: 1px solid rgba(61, 220, 151, 0.6); background: rgba(61, 220, 151, 0.12); color: #3ddc97; cursor: pointer; }
+.mem-open { display: flex; flex: 1; min-width: 0; align-items: flex-start; gap: 10px; min-height: 44px; padding: 0; border: none; background: none; color: inherit; cursor: pointer; }
+.mem-open > svg { flex: none; margin-top: 2px; color: var(--jm-cyan); }
+.mem-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+.mem-note { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; line-height: 1.45; color: var(--jm-text-3); }
+.mem-note svg { flex: none; margin-top: 2px; }
+.mem-clear { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.mem-danger { flex: 1 1 150px; width: auto; min-height: 44px; gap: 6px; color: #ff8fa0; border-color: rgba(255, 107, 129, 0.4); }
+.mem-danger[data-armed] { background: var(--jm-danger); color: #fff; border-color: transparent; }
+.holo-chip[aria-pressed='true'] { border-color: var(--jm-cyan); color: var(--jm-cyan); background: rgba(0, 179, 255, 0.18); }

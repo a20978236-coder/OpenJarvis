@@ -296,6 +296,10 @@ def create_app(
     app.state.memory_backend = memory_backend
     app.state._owns_memory_backend = bool(own_memory_backend)
     app.state.memory_service = memory_service
+    # HELL memory settings (learning off/ask/auto, use in replies).
+    from openjarvis.server.memory_controls import init_memory_controls
+
+    init_memory_controls(app)
     app.state.speech_backend = speech_backend
     app.state.agent_manager = agent_manager
     app.state.agent_scheduler = agent_scheduler
@@ -481,6 +485,15 @@ def create_app(
                 except Exception:
                     pass
 
+    @app.on_event("shutdown")
+    async def _shutdown_memory_controls() -> None:
+        from openjarvis.server.memory_controls import shutdown_memory_controls
+
+        shutdown_memory_controls(app)
+
+    from openjarvis.server.memory_controls import memory_controls_router
+
+    app.include_router(memory_controls_router)
     app.include_router(router)
     app.include_router(dashboard_router)
     app.include_router(comparison_router)

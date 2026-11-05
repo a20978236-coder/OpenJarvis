@@ -69,7 +69,18 @@ function fakeServer(state) {
       return route.fulfill({ status: 200, contentType: 'audio/wav', body: buf });
     }
     if (p === '/v1/memory/stats') return route.fulfill(json({ entries: 3, backend: 'sqlite' }));
-    if (p === '/v1/memory/facts') return route.fulfill(json({ enabled: true, facts: [{ index: 0, text: 'Likes espresso', source: 'auto', created_at: 1, trust: 'auto', recallable: true }] }));
+    if (p === '/v1/memory/facts') {
+      const facts = [{ index: 0, text: 'Likes espresso', source: 'auto', created_at: 1, trust: 'auto', recallable: true }];
+      if (!state.approved) facts.push({ index: 1, text: 'User prefers dark mode', source: 'auto', created_at: 2, trust: 'pending', recallable: false });
+      return route.fulfill(json({ enabled: true, facts }));
+    }
+    if (p === '/v1/memory/facts/approve') {
+      state.approved = req.postDataJSON();
+      return route.fulfill(json({ status: 'approved' }));
+    }
+    if (p === '/v1/memory/settings') {
+      return route.fulfill(json({ learning: 'ask', use_in_replies: true, learning_available: true, facts: { total: 2, pending: state.approved ? 0 : 1, quarantined: 0 }, documents: 0, sensitive_policy: 'Secrets are never stored.' }));
+    }
     if (p === '/v1/memory/documents') return route.fulfill(json({ documents: [], total: 0 }));
     if (p === '/v1/personal/summary') return route.fulfill(json({ open_tasks: 1, due_today: 1, notes: 0 }));
     if (p === '/v1/personal/tasks') {
@@ -361,6 +372,15 @@ console.log(`HELL smoke test — ${base}\n`);
     while (!state.synth.length && Date.now() - t0 < 8000) await page.waitForTimeout(100);
     const got = state.synth[0];
     expect(got && got.voice_id === 'bm_george' && got.speed === 1.25, `preview sent ${JSON.stringify(got)}`);
+  });
+
+  await check('Memory: learned facts wait for approval; Approve sends exactly that fact', async () => {
+    await page.goto(`${base}/m/memory`, { waitUntil: 'networkidle' });
+    await page.getByText(/Waiting for your approval \(1\)/).waitFor({ timeout: 8000 });
+    await page.getByRole('button', { name: 'Approve "User prefers dark mode"' }).click();
+    await page.getByText('Approved — HELL may use it now').waitFor({ timeout: 5000 });
+    expect(state.approved && state.approved.index === 1 && state.approved.text === 'User prefers dark mode', `approve sent ${JSON.stringify(state.approved)}`);
+    expect((await page.getByText(/Waiting for your approval/).count()) === 0, 'pending list did not refresh');
   });
 
   await check('Desktop app at / still renders', async () => {
