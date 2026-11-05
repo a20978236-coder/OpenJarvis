@@ -110,14 +110,20 @@ export const authHeaders = (
 // guarantees no /v1 or /api request is sent without auth — the bug in #266 was
 // that direct fetch() calls omitted the header and 401'd. `path` is the
 // server-relative path (e.g. "/v1/savings").
-export const apiFetch = (
+export const apiFetch = async (
   path: string,
   init: RequestInit = {},
 ): Promise<Response> => {
   const headers = authHeaders(
     (init.headers as Record<string, string> | undefined) ?? {},
   );
-  return fetch(`${getBase()}${path}`, { ...init, headers });
+  const res = await fetch(`${getBase()}${path}`, { ...init, headers });
+  // Let the UI react to an expired/missing sign-in (mobile shows its sign-in
+  // screen). The event name matches UNAUTHORIZED_EVENT in session-api.ts.
+  if (res.status === 401 && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new Event('openjarvis:unauthorized'));
+  }
+  return res;
 };
 
 async function tauriInvoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {

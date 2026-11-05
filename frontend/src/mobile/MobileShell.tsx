@@ -3,13 +3,15 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import { Brain, CheckSquare, Home, MessageCircle, Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '../lib/store';
-import { checkHealth } from '../lib/api';
+import { checkHealth, fetchModels, fetchServerInfo } from '../lib/api';
+import { getSessionStatus, signOut as endSession, UNAUTHORIZED_EVENT } from '../lib/session-api';
 import { useTtsStore } from '../lib/tts';
 import { useSpeech, type SpeechState } from '../hooks/useSpeech';
 import { useChatSender } from '../hooks/useChatSender';
 import { useAutoSpeakReplies } from '../hooks/useAutoSpeakReplies';
 import { deriveOrbState } from './orb-state';
-import type { OrbState } from './JarvisOrb';
+import { JarvisOrb, type OrbState } from './JarvisOrb';
+import { MobileSignIn } from './MobileSignIn';
 import './mobile.css';
 
 /**
@@ -28,6 +30,9 @@ interface MobileContextValue {
   listen: () => Promise<void>;
   /** Stop a recording and return the transcript without sending it. */
   dictate: () => Promise<string | null>;
+  /** How this browser is signed in: a session cookie, an API key, or not needed. */
+  authVia: 'cookie' | 'bearer' | null;
+  signOut: () => Promise<void>;
 }
 
 const MobileContext = createContext<MobileContextValue | null>(null);
@@ -58,7 +63,71 @@ const TABS = [
   { to: '/m/tasks', label: 'Tasks', icon: CheckSquare, end: false },
 ] as const;
 
+type AuthState = 'checking' | 'signed-in' | 'signed-out';
+
+/**
+ * Sign-in gate. The app below only mounts once the browser is signed in (or
+ * the server needs no sign-in), so its health probes and data loads never
+ * run unauthenticated.
+ */
 export function MobileShell() {
+  const [auth, setAuth] = useState<AuthState>('checking');
+  const [via, setVia] = useState<'cookie' | 'bearer' | null>(null);
+  const setModels = useAppStore((s) => s.setModels);
+  const setModelsLoading = useAppStore((s) => s.setModelsLoading);
+  const setServerInfo = useAppStore((s) => s.setServerInfo);
+
+  const check = useCallback(async () => {
+    try {
+      const status = await getSessionStatus();
+      setVia(status.via);
+      setAuth(!status.auth_required || status.authenticated ? 'signed-in' : 'signed-out');
+    } catch {
+      // Server unreachable: open the app in its offline state rather than
+      // demanding a passcode that cannot be checked.
+      setAuth('signed-in');
+    }
+  }, []);
+
+  useEffect(() => {
+    void check();
+    const onUnauthorized = () => setAuth('signed-out');
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, [check]);
+
+  const onSignedIn = useCallback(async () => {
+    // App-level loads ran before sign-in and were refused; redo them.
+    setModelsLoading(true);
+    fetchModels()
+      .then(setModels)
+      .catch(() => setModels([]))
+      .finally(() => setModelsLoading(false));
+    fetchServerInfo().then(setServerInfo).catch(() => {});
+    await check();
+  }, [check, setModels, setModelsLoading, setServerInfo]);
+
+  const signOut = useCallback(async () => {
+    try {
+      await endSession();
+    } finally {
+      setVia(null);
+      setAuth('signed-out');
+    }
+  }, []);
+
+  if (auth === 'checking') {
+    return (
+      <div className="jm" style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <JarvisOrb state="thinking" size={140} showCaption={false} label="Connecting" />
+      </div>
+    );
+  }
+  if (auth === 'signed-out') return <MobileSignIn onSignedIn={onSignedIn} />;
+  return <MobileApp authVia={via} signOut={signOut} />;
+}
+
+function MobileApp({ authVia, signOut }: { authVia: 'cookie' | 'bearer' | null; signOut: () => Promise<void> }) {
   const navigate = useNavigate();
   const [online, setOnline] = useState<boolean | null>(null);
   const updateSettings = useAppStore((s) => s.updateSettings);
@@ -153,8 +222,10 @@ export function MobileShell() {
       toggleTalk,
       listen,
       dictate,
+      authVia,
+      signOut,
     }),
-    [online, orbState, speech.state, speech.available, toggleTalk, listen, dictate],
+    [online, orbState, speech.state, speech.available, toggleTalk, listen, dictate, authVia, signOut],
   );
 
   const toggleVoiceOut = () => {

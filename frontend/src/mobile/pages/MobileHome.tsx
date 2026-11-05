@@ -25,7 +25,7 @@ const QUICK_PROMPTS = [
 
 export function MobileHome() {
   const navigate = useNavigate();
-  const { orbState, toggleTalk, speechAvailable, online } = useMobile();
+  const { orbState, toggleTalk, speechAvailable, online, authVia, signOut } = useMobile();
   const { send } = useChatSender();
   const selectedModel = useAppStore((s) => s.selectedModel);
   const modelsLoading = useAppStore((s) => s.modelsLoading);
@@ -158,6 +158,15 @@ export function MobileHome() {
         <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--jm-text-3)' }}>
           {conversations.length} conversation{conversations.length === 1 ? '' : 's'} on this device
         </p>
+      )}
+      {authVia === 'cookie' && (
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          style={{ alignSelf: 'center', minHeight: 44, padding: '0 16px', background: 'none', border: 'none', color: 'var(--jm-text-3)', fontSize: 13, textDecoration: 'underline', cursor: 'pointer' }}
+        >
+          Sign out of this device
+        </button>
       )}
     </div>
   );
