@@ -115,9 +115,12 @@ def resolve_engine(engine: Any, model: str, _depth: int = 0) -> Any:
             return resolve_engine(engine._engine_for(model), model, _depth + 1)
         except Exception:
             return engine
-    inner = getattr(engine, "__dict__", {}).get("_engine")
-    if inner is not None and inner is not engine:
-        return resolve_engine(inner, model, _depth + 1)
+    fields = getattr(engine, "__dict__", {})
+    # GuardrailsEngine keeps ``_engine``; InstrumentedEngine keeps ``_inner``.
+    for name in ("_engine", "_inner"):
+        inner = fields.get(name)
+        if inner is not None and inner is not engine:
+            return resolve_engine(inner, model, _depth + 1)
     return engine
 
 

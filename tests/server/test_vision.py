@@ -337,3 +337,17 @@ class TestVisionStatus:
         wrapped = Guard(Multi(real))
         assert vision.resolve_engine(wrapped, "llava:7b") is real
         assert vision.engine_accepts_images(wrapped, "llava:7b")
+
+    def test_unwraps_the_real_server_stack(self):
+        """Same nesting `jarvis serve` builds: Guardrails > Instrumented > Multi."""
+        from openjarvis.core.events import EventBus
+        from openjarvis.engine.multi import MultiEngine
+        from openjarvis.security.guardrails import GuardrailsEngine
+        from openjarvis.telemetry.instrumented_engine import InstrumentedEngine
+
+        real = FakeOllama({"llava:7b": ["vision"]})
+        multi = MultiEngine([("ollama", real)])
+        stack = GuardrailsEngine(InstrumentedEngine(multi, EventBus()))
+        assert vision.resolve_engine(stack, "llava:7b") is real
+        assert vision.engine_accepts_images(stack, "llava:7b")
+        assert vision.model_sees_images(stack, "llava:7b") is True

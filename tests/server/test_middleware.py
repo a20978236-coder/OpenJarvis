@@ -127,6 +127,9 @@ class TestSpeechHeaders:
         """Synthesized speech reaches the player as a blob URL."""
         csp = SECURITY_HEADERS["Content-Security-Policy"]
         assert "media-src 'self' blob:" in csp
+        # Vision thumbnails are blob: URLs; data: and remote images stay blocked.
+        assert "img-src 'self' blob:" in csp
+        assert "data:" not in csp
 
     def test_microphone_allowed_for_same_origin(self):
         """An empty allowlist would block the chat UI's own voice input."""
@@ -134,7 +137,9 @@ class TestSpeechHeaders:
         assert "microphone=(self)" in policy
         assert "microphone=()" not in policy
 
-    def test_camera_and_geolocation_stay_blocked(self):
+    def test_camera_and_geolocation_same_origin_only(self):
+        """Vision and location weather need them; no other origin gets them."""
         policy = SECURITY_HEADERS["Permissions-Policy"]
-        assert "camera=()" in policy
-        assert "geolocation=()" in policy
+        assert "camera=(self)" in policy
+        assert "geolocation=(self)" in policy
+        assert "*" not in policy
