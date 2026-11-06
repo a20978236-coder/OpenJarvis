@@ -1,0 +1,77 @@
+name: HELL Cloud (Cloudflare)
+
+# Tests the HELL Worker on every change, and deploys HELL to Cloudflare when
+# `main` changes (or when you press "Run workflow"). Deploying needs two
+# repository secrets — CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (see
+# cloud/README.md). Without them the deploy step is skipped, not failed.
+
+on:
+  push:
+    branches: [main, iphone-standalone]
+    paths:
+      - 'cloud/**'
+      - 'frontend/**'
+      - '.github/workflows/cloud.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cloud/**'
+      - 'frontend/**'
+      - '.github/workflows/cloud.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: cloud-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            cloud/package-lock.json
+
+      - name: Use the reviewed npm toolchain
+        run: npm install --global npm@11.19.0
+
+      - name: Install
+        run: |
+          npm ci --prefix frontend
+          npm ci --prefix cloud
+
+      - name: Test the Worker
+        working-directory: cloud
+        run: |
+          npm audit
+          npm run typecheck
+          npm test
+
+      - name: Build the iPhone app for Cloudflare
+        working-directory: frontend
+        env:
+          HELL_TARGET: cloudflare
+        run: npx tsc -b && npx vite build
+
+      - name: Deploy to Cloudflare
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+        working-directory: cloud
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::Cloudflare secrets are not set, so HELL was tested but not deployed. See cloud/README.md."
+            exit 0
+          fi
+          npx wrangler deploy

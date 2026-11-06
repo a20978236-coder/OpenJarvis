@@ -1,0 +1,28 @@
+{
+  "name": "hell-cloud",
+  "private": true,
+  "type": "module",
+  "description": "HELL's cloud side: a Cloudflare Worker that serves the iPhone app and keeps secrets (passcode, AI keys) off the phone.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build:app": "cd ../frontend && HELL_TARGET=cloudflare npx vite build"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261104.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12",
+    "wrangler": "4.158.0"
+  },
+  "packageManager": "npm@11.19.0",
+  "engines": {
+    "node": ">=22.22",
+    "npm": ">=11.19.0 <12"
+  },
+  "allowScripts": {
+    "esbuild": false,
+    "workerd": false
+  }
+}

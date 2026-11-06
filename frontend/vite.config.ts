@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { handAssetsPlugin } from './scripts/hand-assets.mjs';
 import { compressAssetsPlugin } from './scripts/compress-assets.mjs';
+import { cloudflareHeadersPlugin } from './scripts/cloudflare-headers.mjs';
 
 // VITE_SUPABASE_ANON_KEY is intentionally NOT required here: a missing key
 // disables the savings leaderboard at runtime (see src/lib/supabase.ts) rather
@@ -14,6 +15,12 @@ import { compressAssetsPlugin } from './scripts/compress-assets.mjs';
 const apiTarget = process.env.OPENJARVIS_VITE_PROXY_TARGET
   || process.env.VITE_API_URL
   || 'http://localhost:8000';
+
+// HELL_TARGET=cloudflare builds the iPhone app for the Cloudflare Worker in
+// ../cloud (no computer needed). Cloudflare compresses responses itself, so
+// the .br/.gz copies used by the home server are skipped, and the security
+// headers the home server adds come from cloud/_headers instead.
+const cloudflare = process.env.HELL_TARGET === 'cloudflare';
 
 export default defineConfig({
   resolve: {
@@ -25,7 +32,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     handAssetsPlugin(),
-    compressAssetsPlugin(),
+    ...(cloudflare ? [cloudflareHeadersPlugin()] : [compressAssetsPlugin()]),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
@@ -67,7 +74,7 @@ export default defineConfig({
     }),
   ],
   build: {
-    outDir: '../src/openjarvis/server/static',
+    outDir: cloudflare ? '../cloud/public' : '../src/openjarvis/server/static',
     emptyOutDir: true,
     // Preserve the Vite 6 browser baseline for existing desktop webviews.
     target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],

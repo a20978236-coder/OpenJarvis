@@ -1,0 +1,19 @@
+// HELL on Cloudflare: one Worker serves the iPhone app (static files) and
+// the small API that keeps secrets off the phone. Deployed by GitHub Actions
+// (.github/workflows/hell-cloud.yml); secrets are set in the Cloudflare
+// dashboard (see cloud/README.md), never in this file.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hell",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    // Built by: HELL_TARGET=cloudflare npm run build (in frontend/)
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // The API runs before static files; everything else is the app.
+    "run_worker_first": ["/v1/*", "/health"]
+  },
+  "observability": { "enabled": true }
+}
