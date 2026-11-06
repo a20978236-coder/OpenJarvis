@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Bot, Check, Cpu, Puzzle } from 'lucide-react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { Bot, Check, Cpu, Puzzle, Smartphone } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { useAppStore } from '../../lib/store';
 import { isEmbedOnlyModel } from '../../lib/model-capabilities';
@@ -54,6 +54,9 @@ function NameList({ load, empty }: { load: Load<string[]>; empty: string }) {
   );
 }
 
+// Loaded only when this screen opens, so the dashboard stays light.
+const LocalAiTest = lazy(() => import('./LocalAiTest'));
+
 /** Read-only view of the AI building blocks on the user's server. */
 export function AiModules() {
   const models = useAppStore((s) => s.models);
@@ -94,6 +97,12 @@ export function AiModules() {
             ))}
           </div>
         )}
+      </Section>
+
+      <Section icon={<Smartphone size={16} />} title="On-phone AI · test">
+        <Suspense fallback={<p style={{ fontSize: 14, color: 'var(--jm-text-3)' }}>Loading…</p>}>
+          <LocalAiTest />
+        </Suspense>
       </Section>
 
       <Section icon={<Bot size={16} />} title="Agents">

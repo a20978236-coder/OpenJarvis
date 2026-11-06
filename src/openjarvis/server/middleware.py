@@ -53,10 +53,15 @@ def create_security_middleware() -> Any:
             )
             # media-src blob: lets the UI play synthesized speech, which arrives
             # as a blob URL; img-src blob: shows the Vision photos the page
-            # captured itself. default-src alone refused both.
+            # captured itself. default-src alone refused both. worker-src blob:
+            # and connect-src Hugging Face let the on-phone AI test run its
+            # worker and download an open model straight to the phone.
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-                "media-src 'self' blob:; img-src 'self' blob:"
+                "media-src 'self' blob:; img-src 'self' blob:; "
+                "worker-src 'self' blob:; "
+                "connect-src 'self' https://huggingface.co https://*.hf.co "
+                "https://*.huggingface.co"
             )
             return response
 
@@ -73,6 +78,9 @@ SECURITY_HEADERS = {
     "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(self)",
     "Content-Security-Policy": (
         "default-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-        "media-src 'self' blob:; img-src 'self' blob:"
+        "media-src 'self' blob:; img-src 'self' blob:; "
+        "worker-src 'self' blob:; "
+        "connect-src 'self' https://huggingface.co https://*.hf.co "
+        "https://*.huggingface.co"
     ),
 }

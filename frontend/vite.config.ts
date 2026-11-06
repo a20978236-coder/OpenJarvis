@@ -65,6 +65,14 @@ export default defineConfig({
         globIgnores: ['mediapipe/**'],
         runtimeCaching: [
           {
+            // On-phone AI engine (~9 MB): not precached; kept after first use
+            // so local models also load offline. (The models themselves are
+            // stored by the engine, not by the service worker.)
+            urlPattern: ({ url }) => url.pathname.startsWith('/assets/') && url.pathname.endsWith('.wasm'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'hell-local-ai', expiration: { maxEntries: 4 } },
+          },
+          {
             urlPattern: ({ url }) => url.pathname.startsWith('/mediapipe/'),
             handler: 'CacheFirst',
             options: { cacheName: 'hell-hand-tracking', expiration: { maxEntries: 8 } },

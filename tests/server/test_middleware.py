@@ -131,6 +131,21 @@ class TestSpeechHeaders:
         assert "img-src 'self' blob:" in csp
         assert "data:" not in csp
 
+    def test_csp_allows_on_phone_model_download_only(self):
+        """The on-phone AI test may fetch open models from Hugging Face and
+        start its blob: worker -- and nothing else is opened up."""
+        csp = SECURITY_HEADERS["Content-Security-Policy"]
+        assert "worker-src 'self' blob:" in csp
+        connect = next(
+            d.strip() for d in csp.split(";") if d.strip().startswith("connect-src")
+        )
+        assert connect.split()[1:] == [
+            "'self'",
+            "https://huggingface.co",
+            "https://*.hf.co",
+            "https://*.huggingface.co",
+        ]
+
     def test_microphone_allowed_for_same_origin(self):
         """An empty allowlist would block the chat UI's own voice input."""
         policy = SECURITY_HEADERS["Permissions-Policy"]

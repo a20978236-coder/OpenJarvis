@@ -75,6 +75,17 @@ HELL refuses every sign-in until you do this — it is never left open.
 2. Enter your passcode.
 3. Tap **Share** → **Add to Home Screen** for the full-screen app.
 
+## 7. Try on-phone AI (works offline)
+
+1. In HELL, open **AI Modules** → **On-phone AI · test**.
+2. Pick **Qwen2.5 0.5B** (recommended first) and tap **Download 491 MB and
+   test**. Use Wi-Fi: the model downloads once from Hugging Face directly to
+   your phone and is kept there.
+3. When it finishes, tap **Copy results** and paste them to Claude. Try the
+   other sizes too: if Safari reloads the page mid-test, that model is too
+   big for the phone's memory, and HELL will say so next time.
+4. **Remove from phone** frees the space again.
+
 ## Good to know
 
 - **Signing out everywhere:** change `SESSION_SECRET` in Cloudflare. Every
