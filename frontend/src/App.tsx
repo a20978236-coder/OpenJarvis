@@ -1,14 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { Routes, Route } from 'react-router';
-import { Layout } from './components/Layout';
-import { ChatPage } from './pages/ChatPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { GetStartedPage } from './pages/GetStartedPage';
-import { AgentsPage } from './pages/AgentsPage';
-import { DataSourcesPage } from './pages/DataSourcesPage';
-import { LogsPage } from './pages/LogsPage';
-import { CommandPalette } from './components/CommandPalette';
+import { lazy, Suspense, useEffect, useState, useCallback, useRef, type ComponentType } from 'react';
+import { Routes, Route, useLocation } from 'react-router';
 import { SetupScreen } from './components/SetupScreen';
 import { Toaster } from './components/ui/sonner';
 import { useAppStore } from './lib/store';
@@ -17,8 +8,43 @@ import { OptInModal } from './components/OptInModal';
 import { UpdateChecker } from './components/Desktop/UpdateChecker';
 import { track, hashId } from './lib/analytics';
 import { offerAnalyticsChoice } from './lib/analytics-invitation';
+import { MobileShell } from './mobile/MobileShell';
+import { HoloDashboard } from './mobile/dashboard/HoloDashboard';
+
+/**
+ * Screens load on demand: the iPhone app only downloads the dashboard (and
+ * what it needs) to start, and never the desktop pages or their charts.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function lazyNamed<T extends ComponentType<any>>(load: () => Promise<Record<string, unknown>>, name: string) {
+  return lazy(async () => ({ default: (await load())[name] as T }));
+}
+const Layout = lazyNamed(() => import('./components/Layout'), 'Layout');
+const ChatPage = lazyNamed(() => import('./pages/ChatPage'), 'ChatPage');
+const DashboardPage = lazyNamed(() => import('./pages/DashboardPage'), 'DashboardPage');
+const SettingsPage = lazyNamed(() => import('./pages/SettingsPage'), 'SettingsPage');
+const GetStartedPage = lazyNamed(() => import('./pages/GetStartedPage'), 'GetStartedPage');
+const AgentsPage = lazyNamed(() => import('./pages/AgentsPage'), 'AgentsPage');
+const DataSourcesPage = lazyNamed(() => import('./pages/DataSourcesPage'), 'DataSourcesPage');
+const LogsPage = lazyNamed(() => import('./pages/LogsPage'), 'LogsPage');
+const CommandPalette = lazyNamed(() => import('./components/CommandPalette'), 'CommandPalette');
+const ModuleScreen = lazyNamed(() => import('./mobile/pages/ModuleScreen'), 'ModuleScreen');
+const MobileSettings = lazyNamed(() => import('./mobile/pages/MobileSettings'), 'MobileSettings');
+const AiModules = lazyNamed(() => import('./mobile/pages/AiModules'), 'AiModules');
+const HologramBuilder = lazyNamed(() => import('./mobile/hologram/HologramBuilder'), 'HologramBuilder');
+const VisionScreen = lazyNamed(() => import('./mobile/vision/VisionScreen'), 'VisionScreen');
+const GesturesScreen = lazyNamed(() => import('./mobile/gestures/GesturesScreen'), 'GesturesScreen');
+const CalibrationScreen = lazyNamed(() => import('./mobile/gestures/CalibrationScreen'), 'CalibrationScreen');
+const VoiceSettings = lazyNamed(() => import('./mobile/voice/VoiceSettings'), 'VoiceSettings');
+const DiagnosticsScreen = lazyNamed(() => import('./mobile/diagnostics/DiagnosticsScreen'), 'DiagnosticsScreen');
+const AppsScreen = lazyNamed(() => import('./mobile/apps/AppsScreen'), 'AppsScreen');
+const FilesScreen = lazyNamed(() => import('./mobile/apps/FilesScreen'), 'FilesScreen');
+const MobileChat = lazyNamed(() => import('./mobile/pages/MobileChat'), 'MobileChat');
+const MobileMemory = lazyNamed(() => import('./mobile/pages/MobileMemory'), 'MobileMemory');
+const MobileTasks = lazyNamed(() => import('./mobile/pages/MobileTasks'), 'MobileTasks');
 
 export default function App() {
+  const isMobileRoute = /^\/m(\/|$)/.test(useLocation().pathname);
   const [setupDone, setSetupDone] = useState(!isTauri());
   const handleSetupReady = useCallback(() => {
     setSetupDone(true);
@@ -182,7 +208,26 @@ export default function App() {
   return (
     <>
       <UpdateChecker />
+      <Suspense fallback={<div className="route-loading" role="status">Loading…</div>}>
       <Routes>
+        {/* iPhone app (installable PWA starts here) */}
+        <Route path="m" element={<MobileShell />}>
+          <Route index element={<HoloDashboard />} />
+          <Route path="chat" element={<MobileChat />} />
+          <Route path="memory" element={<MobileMemory />} />
+          <Route path="tasks" element={<MobileTasks />} />
+          <Route path="settings" element={<MobileSettings />} />
+          <Route path="ai" element={<AiModules />} />
+          <Route path="hologram" element={<HologramBuilder />} />
+          <Route path="vision" element={<VisionScreen />} />
+          <Route path="gestures" element={<GesturesScreen />} />
+          <Route path="calibration" element={<CalibrationScreen />} />
+          <Route path="voice" element={<VoiceSettings />} />
+          <Route path="diagnostics" element={<DiagnosticsScreen />} />
+          <Route path="apps" element={<AppsScreen />} />
+          <Route path="files" element={<FilesScreen />} />
+          <Route path="module/:id" element={<ModuleScreen />} />
+        </Route>
         <Route element={<Layout />}>
           <Route index element={<ChatPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
@@ -193,9 +238,29 @@ export default function App() {
           <Route path="logs" element={<LogsPage />} />
         </Route>
       </Routes>
-      <Toaster position="bottom-right" />
-      {commandPaletteOpen && <CommandPalette />}
-      {optInModalOpen && (
+      </Suspense>
+      {isMobileRoute ? (
+        <Toaster
+          position="top-center"
+          theme="dark"
+          offset={{ top: 'calc(env(safe-area-inset-top) + 8px)' }}
+          mobileOffset={{ top: 'calc(env(safe-area-inset-top) + 8px)' }}
+          style={{
+            '--normal-bg': '#0b1b3d',
+            '--normal-text': '#e6f3ff',
+            '--normal-border': 'rgba(0, 179, 255, 0.35)',
+            '--border-radius': '14px',
+          } as React.CSSProperties}
+        />
+      ) : (
+        <Toaster position="bottom-right" />
+      )}
+      {commandPaletteOpen && !isMobileRoute && (
+        <Suspense fallback={null}>
+          <CommandPalette />
+        </Suspense>
+      )}
+      {optInModalOpen && !isMobileRoute && (
         <OptInModal onClose={() => setOptInModalOpen(false)} />
       )}
     </>

@@ -176,6 +176,20 @@
     overflow: hidden;
   }
 
+  /* iOS: use the dynamic viewport so Safari's toolbars never hide content,
+     and keep the app clear of the notch and home indicator. env() is 0 on
+     devices without insets, so desktop layout is unchanged. */
+  @supports (height: 100dvh) {
+    html, body, #root {
+      height: 100dvh;
+    }
+  }
+
+  #root {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+      env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
   body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-weight: 400;
@@ -185,6 +199,8 @@
     color: var(--color-text);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
   }
 
   ::selection {
@@ -322,6 +338,10 @@
     padding-left: 1.5em;
     margin-bottom: 0.75em;
   }
+
+  /* Tailwind's preflight strips list markers; restore them for replies. */
+  .prose ul { list-style: disc; }
+  .prose ol { list-style: decimal; }
 
   .prose li {
     margin-bottom: 0.25em;
@@ -754,3 +774,13 @@
   background: var(--color-accent);
   text-decoration: none;
 }
+
+/* iOS Safari zooms the page into any focused field under 16px. Unlayered on
+   purpose so it outranks Tailwind's text-size utilities; touch devices only,
+   so desktop sizing is unchanged. */
+@media (pointer: coarse) {
+  input, textarea, select {
+    font-size: max(16px, 1em);
+  }
+}
+.route-loading { display: grid; place-items: center; min-height: 40vh; font-size: 14px; opacity: 0.7; }

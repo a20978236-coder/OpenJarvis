@@ -80,6 +80,7 @@ def _default_fact_path() -> Path:
 TRUST_AUTO = "auto"  # auto-extracted and scanner-clean → recallable
 TRUST_TRUSTED = "trusted"  # explicitly vouched for by the user
 TRUST_UNTRUSTED = "untrusted"  # scanner flagged the text → quarantined
+TRUST_PENDING = "pending"  # waiting for the user's approval → not recallable
 
 # "" is the legacy on-disk value, written before provenance existed. It stays
 # recallable so upgrading does not silently erase a user's existing memory.
@@ -199,6 +200,15 @@ class FactStore(ABC):
         """
         del expected_text
         return self.set_trust(index, TRUST_TRUSTED)
+
+    def remove_reviewed(self, index: int, expected_text: str) -> bool:
+        """Delete the fact at *index* (0-based, as returned by :meth:`list`)
+        only if it still has *expected_text*. Returns True if one was removed.
+
+        The text check makes deletion safe against concurrent writers that
+        shift indexes. Optional for third-party stores.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def list(self) -> List[Fact]:
@@ -320,7 +330,13 @@ class LocalFactStore(FactStore):
                 # A later hostile derivation must be able to quarantine an
                 # older recallable copy. Never auto-promote in the opposite
                 # direction; promotion requires explicit human review.
-                if trust not in _RECALLABLE_TIERS and duplicate.trusted_for_recall:
+                # (A re-learned copy awaiting approval must not demote a fact
+                # the user already approved.)
+                if (
+                    trust not in _RECALLABLE_TIERS
+                    and trust != TRUST_PENDING
+                    and duplicate.trusted_for_recall
+                ):
                     duplicate.trust = trust or TRUST_UNTRUSTED
                     self._flush()
                 return False  # dedupe
@@ -341,7 +357,7 @@ class LocalFactStore(FactStore):
 
     def set_trust(self, index: int, trust: str) -> bool:
         trust = (trust or "").strip().lower()
-        if trust not in {TRUST_AUTO, TRUST_TRUSTED, TRUST_UNTRUSTED}:
+        if trust not in {TRUST_AUTO, TRUST_TRUSTED, TRUST_UNTRUSTED, TRUST_PENDING}:
             raise ValueError(f"Unknown fact trust tier: {trust!r}")
         with self._lock, _cross_process_lock(self._lock_path()):
             self._sync_from_disk_locked()
@@ -361,6 +377,18 @@ class LocalFactStore(FactStore):
             if fact.text != expected_text or fact.trusted_for_recall:
                 return False
             fact.trust = TRUST_TRUSTED
+            self._flush()
+        return True
+
+    def remove_reviewed(self, index: int, expected_text: str) -> bool:
+        """Atomically delete exactly the fact a user chose to forget."""
+        with self._lock, _cross_process_lock(self._lock_path()):
+            self._sync_from_disk_locked()
+            if not 0 <= index < len(self._facts):
+                return False
+            if self._facts[index].text != expected_text:
+                return False
+            del self._facts[index]
             self._flush()
         return True
 
@@ -446,6 +474,7 @@ def load_configured_facts(config: Any) -> List[Fact]:
 __all__ = [
     "RECALLABLE_TRUST_TIERS",
     "TRUST_AUTO",
+    "TRUST_PENDING",
     "TRUST_TRUSTED",
     "TRUST_UNTRUSTED",
     "Fact",

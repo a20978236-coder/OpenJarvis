@@ -6,7 +6,13 @@ vi.mock('./api', () => ({
 }));
 
 import { synthesizeSpeech, fetchTtsHealth } from './api';
-import { useTtsStore, __resetTtsForTests, shouldAutoplayFinishedReply } from './tts';
+import {
+  useTtsStore,
+  __resetTtsForTests,
+  shouldAutoplayFinishedReply,
+  installAudioUnlock,
+  unlockAudioPlayback,
+} from './tts';
 
 const synth = vi.mocked(synthesizeSpeech);
 const health = vi.mocked(fetchTtsHealth);
@@ -250,5 +256,74 @@ describe('autoplay gating', () => {
     expect(
       shouldAutoplayFinishedReply('chat-1', 'chat-2', true, { role: 'assistant', id: 'old' }, null),
     ).toBe(false);
+  });
+});
+
+describe('iOS audio unlock', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('reuses the gesture-unlocked element for later replies', async () => {
+    unlockAudioPlayback();
+    await flush();
+    expect(FakeAudio.instances).toHaveLength(1);
+    const primed = FakeAudio.instances[0];
+    // blob:, never data: -- the server's CSP (media-src 'self' blob:) blocks
+    // data: URLs, which would silently defeat the unlock on a real deploy.
+    expect(primed.src).toBe('blob:fake/1');
+    expect(revoked).not.toContain('blob:fake/1'); // silent clip kept: the element may still read it
+
+    synth.mockResolvedValue(new Blob(['x']));
+    await useTtsStore.getState().speak('m1', 'Hello there');
+
+    // No new element: playback went through the unlocked one.
+    expect(FakeAudio.instances).toHaveLength(1);
+    expect(primed.src).toBe('blob:fake/2');
+    expect(primed.playCalls).toBe(2);
+    expect(useTtsStore.getState().state).toBe('speaking');
+  });
+
+  it('keeps working after a reply ends (element stays unlocked)', async () => {
+    unlockAudioPlayback();
+    await flush();
+    const primed = FakeAudio.instances[0];
+    synth.mockResolvedValue(new Blob(['x']));
+
+    await useTtsStore.getState().speak('m1', 'One');
+    primed.onended?.();
+    await useTtsStore.getState().speak('m2', 'Two');
+
+    expect(FakeAudio.instances).toHaveLength(1);
+    expect(useTtsStore.getState().speakingId).toBe('m2');
+  });
+
+  it('falls back to a fresh element when never unlocked', async () => {
+    synth.mockResolvedValue(new Blob(['x']));
+    await useTtsStore.getState().speak('m1', 'Hello');
+    expect(FakeAudio.instances).toHaveLength(1);
+    expect(FakeAudio.instances[0].src).toBe('blob:fake/1');
+  });
+
+  it('retries on the next gesture when the first unlock is refused', async () => {
+    const target = new EventTarget() as unknown as Document;
+    const realPlay = FakeAudio.prototype.play;
+    FakeAudio.prototype.play = function () {
+      this.playCalls += 1;
+      return Promise.reject(new DOMException('blocked', 'NotAllowedError'));
+    };
+    try {
+      installAudioUnlock(target);
+      target.dispatchEvent(new Event('touchend'));
+      await flush();
+    } finally {
+      FakeAudio.prototype.play = realPlay;
+    }
+    target.dispatchEvent(new Event('touchend'));
+    await flush();
+    expect(FakeAudio.instances).toHaveLength(2);
+
+    // Once unlocked, further taps do nothing.
+    target.dispatchEvent(new Event('touchend'));
+    await flush();
+    expect(FakeAudio.instances).toHaveLength(2);
   });
 });

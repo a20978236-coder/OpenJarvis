@@ -110,14 +110,20 @@ export const authHeaders = (
 // guarantees no /v1 or /api request is sent without auth — the bug in #266 was
 // that direct fetch() calls omitted the header and 401'd. `path` is the
 // server-relative path (e.g. "/v1/savings").
-export const apiFetch = (
+export const apiFetch = async (
   path: string,
   init: RequestInit = {},
 ): Promise<Response> => {
   const headers = authHeaders(
     (init.headers as Record<string, string> | undefined) ?? {},
   );
-  return fetch(`${getBase()}${path}`, { ...init, headers });
+  const res = await fetch(`${getBase()}${path}`, { ...init, headers });
+  // Let the UI react to an expired/missing sign-in (mobile shows its sign-in
+  // screen). The event name matches UNAUTHORIZED_EVENT in session-api.ts.
+  if (res.status === 401 && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new Event('openjarvis:unauthorized'));
+  }
+  return res;
 };
 
 async function tauriInvoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
@@ -423,6 +429,33 @@ export async function synthesizeSpeech(
     throw new Error(detail || `Speech synthesis failed: ${res.status}`);
   }
   return res.blob();
+}
+
+export interface TtsVoices {
+  available: boolean;
+  backend?: string;
+  voices: string[];
+  default_voice: string;
+  speed: number;
+}
+
+/** Voices offered by the HELL server's text-to-speech backend. */
+export async function fetchTtsVoices(): Promise<TtsVoices> {
+  const empty: TtsVoices = { available: false, voices: [], default_voice: '', speed: 1 };
+  try {
+    const res = await apiFetch(`/v1/speech/voices`);
+    if (!res.ok) return empty;
+    const b = await res.json();
+    return {
+      available: b?.available === true,
+      backend: typeof b?.backend === 'string' ? b.backend : undefined,
+      voices: Array.isArray(b?.voices) ? b.voices.filter((v: unknown) => typeof v === 'string') : [],
+      default_voice: typeof b?.default_voice === 'string' ? b.default_voice : '',
+      speed: typeof b?.speed === 'number' ? b.speed : 1,
+    };
+  } catch {
+    return empty;
+  }
 }
 
 export async function fetchTtsHealth(): Promise<TtsHealth> {
@@ -1099,7 +1132,7 @@ export async function getMemoryStats(): Promise<MemoryStats> {
   try {
     res = await apiFetch(`/v1/memory/stats`);
   } catch {
-    throw new Error('Could not reach the OpenJarvis API. Check the server status and API URL, then retry.');
+    throw new Error('Could not reach the HELL server. Check the server status and API URL, then retry.');
   }
   if (!res.ok) {
     const detail = await memoryErrorDetail(res, 'Memory status request failed');

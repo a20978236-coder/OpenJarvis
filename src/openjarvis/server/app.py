@@ -8,8 +8,7 @@ import pathlib
 import threading
 import time
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from openjarvis.server.analytics_routes import (
@@ -296,6 +295,10 @@ def create_app(
     app.state.memory_backend = memory_backend
     app.state._owns_memory_backend = bool(own_memory_backend)
     app.state.memory_service = memory_service
+    # HELL memory settings (learning off/ask/auto, use in replies).
+    from openjarvis.server.memory_controls import init_memory_controls
+
+    init_memory_controls(app)
     app.state.speech_backend = speech_backend
     app.state.agent_manager = agent_manager
     app.state.agent_scheduler = agent_scheduler
@@ -317,6 +320,13 @@ def create_app(
     # Exposed so WebSocket handlers can authenticate the handshake (the HTTP
     # AuthMiddleware never sees WS upgrade requests). Empty = auth disabled.
     app.state.api_key = api_key
+    # Passcode sign-in for browsers (HttpOnly session cookie) whenever the
+    # API is protected by a key; see session_auth.
+    app.state.session_auth = None
+    if api_key:
+        from openjarvis.server.session_auth import SessionAuth
+
+        app.state.session_auth = SessionAuth(api_key)
 
     @app.on_event("shutdown")
     async def _shutdown_managed_runtime() -> None:
@@ -474,6 +484,15 @@ def create_app(
                 except Exception:
                     pass
 
+    @app.on_event("shutdown")
+    async def _shutdown_memory_controls() -> None:
+        from openjarvis.server.memory_controls import shutdown_memory_controls
+
+        shutdown_memory_controls(app)
+
+    from openjarvis.server.memory_controls import memory_controls_router
+
+    app.include_router(memory_controls_router)
     app.include_router(router)
     app.include_router(dashboard_router)
     app.include_router(comparison_router)
@@ -482,6 +501,9 @@ def create_app(
     app.include_router(upload_router)
     app.include_router(research_router)
     app.include_router(analytics_router)
+    from openjarvis.server.session_routes import session_router
+
+    app.include_router(session_router)
     include_all_routes(app)
 
     # Restore SendBlue channel bindings from database on startup
@@ -541,24 +563,30 @@ def create_app(
     if static_dir.is_dir():
         assets_dir = static_dir / "assets"
         if assets_dir.is_dir():
+            from openjarvis.server.static_compress import CompressedAssets
+
             app.mount(
                 "/assets",
-                _NoCacheStaticFiles(directory=assets_dir),
+                CompressedAssets(directory=assets_dir),
                 name="static-assets",
             )
 
         @app.get("/{full_path:path}")
-        async def spa_catch_all(full_path: str):
+        async def spa_catch_all(full_path: str, request: Request):
             """Serve static files directly, fall back to index.html for SPA routes."""
+            from openjarvis.server.static_compress import compressed_file_response
+
+            accept = request.headers.get("accept-encoding", "")
             if full_path:
                 candidate = (static_dir / full_path).resolve()
                 # Path traversal prevention
                 resolved_root = static_dir.resolve()
                 if candidate.is_relative_to(resolved_root) and candidate.is_file():
-                    return FileResponse(candidate, headers=_NO_CACHE_HEADERS)
-            return FileResponse(
-                static_dir / "index.html",
-                headers=_NO_CACHE_HEADERS,
+                    return compressed_file_response(
+                        candidate, accept, _NO_CACHE_HEADERS
+                    )
+            return compressed_file_response(
+                static_dir / "index.html", accept, _NO_CACHE_HEADERS
             )
 
     return app

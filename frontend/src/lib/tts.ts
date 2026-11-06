@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { synthesizeSpeech, fetchTtsHealth } from './api';
 import { toSpeakableText } from './message-text';
+import { levelAt, resumeAudioContext, wavEnvelope } from './audio-level';
+import { deviceVoicesSupported } from './device-speech';
+import { pickOutputEngine, useVoicePrefs } from './voice-prefs';
 
 export type TtsState = 'idle' | 'loading' | 'speaking';
 
@@ -18,8 +21,12 @@ interface TtsStore {
   error: string | null;
   /** Message whose read-aloud attempt failed, if any. */
   errorId: string | null;
-  /** null until the health probe has answered. */
+  /** null until the health probe has answered: can HELL speak at all? */
   available: boolean | null;
+  /** The HELL server's voice is available (null = not probed yet). */
+  serverAvailable: boolean | null;
+  /** Which engine spoke (or is speaking) the latest reply. */
+  engine: 'server' | 'device' | null;
   /** Last message spoken by autoplay, so a re-render never repeats it. */
   autoSpokenId: string | null;
   speak: (id: string, text: string) => Promise<void>;
@@ -35,6 +42,135 @@ let objectUrl: string | null = null;
 let controller: AbortController | null = null;
 let token = 0;
 let healthProbe: Promise<void> | null = null;
+/** Volume envelope of the WAV being played (voice-reactive orb). */
+let envelope: ReturnType<typeof wavEnvelope> = null;
+/** Device voices give no audio access: a pulse per spoken word instead. */
+let wordPulseAt = 0;
+let deviceSpeaking = false;
+
+/**
+ * HELL's speaking level right now, 0..1, for the orb. Server voice: the real
+ * volume of the audio. Device voice: a pulse on each word (iOS does not
+ * expose the system voice's audio). null when nothing is playing.
+ */
+export function getSpeechLevel(): number | null {
+  if (audio && envelope && !audio.paused) return levelAt(envelope, audio.currentTime);
+  if (deviceSpeaking) {
+    const since = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - wordPulseAt;
+    return Math.max(0.15, 0.95 * Math.exp(-since / 220));
+  }
+  return null;
+}
+
+function stopDeviceSpeech(): void {
+  deviceSpeaking = false;
+  if (deviceVoicesSupported()) {
+    try {
+      speechSynthesis.cancel();
+    } catch {
+      // nothing to cancel
+    }
+  }
+}
+
+/** Prime the device voice inside a gesture (iOS requires the first one there). */
+function primeDeviceSpeech(): void {
+  if (!deviceVoicesSupported() || primed) return;
+  primed = true;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    speechSynthesis.speak(u);
+  } catch {
+    // ignore
+  }
+}
+let primed = false;
+
+/**
+ * iOS Safari only lets an audio element play if it was first started from a
+ * user gesture. Replies are spoken after a network round trip -- long after
+ * the tap -- so a fresh `new Audio()` there is silently blocked. Instead, the
+ * first tap plays a few milliseconds of silence on one element, and every
+ * later utterance reuses that already-unlocked element.
+ */
+// 10 ms of 8 kHz mono silence. Played from a blob: URL, not a data: URL,
+// because the server's Content-Security-Policy allows `media-src 'self' blob:`
+// only (a data: URL is blocked there, which would silently skip the unlock).
+const SILENT_WAV_BASE64 =
+  'UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAACA'
+  + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg'
+  + 'ICAgICAgICAgICAgICAgICAgICAgA==';
+
+function silentWavUrl(): string {
+  const bytes = Uint8Array.from(atob(SILENT_WAV_BASE64), (c) => c.charCodeAt(0));
+  return URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+}
+
+let unlockedEl: HTMLAudioElement | null = null;
+let unlockInstalled = false;
+let removeUnlockListeners: (() => void) | null = null;
+
+/** Prime one audio element for playback; must run inside a user gesture. */
+export function unlockAudioPlayback(): void {
+  if (unlockedEl || typeof Audio === 'undefined') return;
+  let url: string | null = null;
+  const release = () => {
+    if (url) URL.revokeObjectURL(url);
+    url = null;
+  };
+  try {
+    url = silentWavUrl();
+    const el = new Audio(url);
+    const played = el.play();
+    const markUnlocked = () => {
+      el.pause();
+      // Keep the (~120 byte) silent clip's URL: the element may still read
+      // from it, and revoking it here logged ERR_FILE_NOT_FOUND.
+      url = null;
+      unlockedEl = el;
+      removeUnlockListeners?.();
+      removeUnlockListeners = null;
+    };
+    if (played && typeof played.then === 'function') {
+      played.then(markUnlocked).catch(() => {
+        // Gesture did not qualify; the next one will try again. Detach the
+        // clip first so the element stops reading the URL we revoke.
+        el.removeAttribute?.('src');
+        release();
+      });
+    } else {
+      markUnlocked();
+    }
+  } catch {
+    release();
+    // Audio unavailable; playback falls back to a fresh element per reply.
+  }
+}
+
+/** Unlock audio on the first tap/click/key press anywhere in the app. */
+export function installAudioUnlock(target: Pick<Document, 'addEventListener' | 'removeEventListener'> = document): void {
+  if (unlockInstalled) return;
+  unlockInstalled = true;
+  const events = ['touchend', 'pointerup', 'keydown'] as const;
+  // Listeners stay until an unlock actually succeeds, then remove themselves.
+  const handler = () => {
+    unlockAudioPlayback();
+    primeDeviceSpeech();
+    resumeAudioContext();
+  };
+  events.forEach((e) => target.addEventListener(e, handler, true));
+  removeUnlockListeners = () => events.forEach((e) => target.removeEventListener(e, handler, true));
+}
+
+/** Element for the next utterance: the unlocked one when available. */
+function playbackElement(url: string): HTMLAudioElement {
+  if (unlockedEl) {
+    unlockedEl.src = url;
+    return unlockedEl;
+  }
+  return new Audio(url);
+}
 
 /** Only a stream ending in the active conversation may trigger autoplay. */
 export function shouldAutoplayFinishedReply(
@@ -53,6 +189,8 @@ export function shouldAutoplayFinishedReply(
 }
 
 function teardown(): void {
+  envelope = null;
+  stopDeviceSpeech();
   if (audio) {
     // Detach first: clearing src re-runs the media load algorithm, which fails
     // on an empty source and dispatches an `error` event. With the handler
@@ -74,23 +212,67 @@ function teardown(): void {
   }
 }
 
+type SetTts = (patch: Partial<TtsStore>) => void;
+
+/** Speak with the device's built-in voice (free; on iPhone, on the phone). */
+function speakOnDevice(id: string, text: string, mine: number, set: SetTts): void {
+  const prefs = useVoicePrefs.getState();
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = prefs.rate;
+    const voice = prefs.deviceVoice ? speechSynthesis.getVoices().find((v) => v.voiceURI === prefs.deviceVoice) : undefined;
+    if (voice) {
+      u.voice = voice;
+      u.lang = voice.lang;
+    }
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    u.onstart = () => {
+      if (mine !== token) return;
+      deviceSpeaking = true;
+      wordPulseAt = now();
+      set({ state: 'speaking', speakingId: id, engine: 'device' });
+    };
+    u.onboundary = () => {
+      wordPulseAt = now();
+    };
+    u.onend = () => {
+      if (mine !== token) return;
+      deviceSpeaking = false;
+      set({ state: 'idle', speakingId: null });
+    };
+    u.onerror = (e) => {
+      if (mine !== token) return;
+      deviceSpeaking = false;
+      const interrupted = e.error === 'interrupted' || e.error === 'canceled';
+      set({ state: 'idle', speakingId: null, ...(interrupted ? {} : { error: 'The device voice could not speak', errorId: id }) });
+    };
+    speechSynthesis.speak(u);
+  } catch {
+    set({ state: 'idle', speakingId: null, error: 'The device voice could not speak', errorId: id });
+  }
+}
+
 export const useTtsStore = create<TtsStore>((set, get) => ({
   state: 'idle',
   speakingId: null,
   error: null,
   errorId: null,
   available: null,
+  serverAvailable: null,
+  engine: null,
   autoSpokenId: null,
 
   ensureHealth: () => {
     if (healthProbe) return healthProbe;
+    const canSpeak = (server: boolean) => pickOutputEngine(useVoicePrefs.getState().output, server, deviceVoicesSupported()) !== null;
     healthProbe = fetchTtsHealth()
       .then((health) => {
-        set({ available: health.available });
+        set({ serverAvailable: health.available, available: canSpeak(health.available) });
         if (!health.available) healthProbe = null;
       })
       .catch(() => {
-        set({ available: false });
+        set({ serverAvailable: false, available: canSpeak(false) });
         healthProbe = null;
       });
     return healthProbe;
@@ -109,16 +291,35 @@ export const useTtsStore = create<TtsStore>((set, get) => ({
     teardown();
     set({ state: 'loading', speakingId: id, error: null, errorId: null });
 
+    const prefs = useVoicePrefs.getState();
+    const deviceOk = deviceVoicesSupported();
+    const serverKnown = get().serverAvailable;
+    // Unknown server health: try it (the probe may still be running).
+    const engine = pickOutputEngine(prefs.output, serverKnown !== false, deviceOk);
+    if (engine === 'device') {
+      speakOnDevice(id, trimmed, mine, set);
+      return;
+    }
+
     const ac = new AbortController();
     controller = ac;
 
     try {
-      const blob = await synthesizeSpeech(trimmed, { signal: ac.signal });
+      const opts: { signal: AbortSignal; voiceId?: string; speed?: number } = { signal: ac.signal };
+      if (prefs.serverVoice) opts.voiceId = prefs.serverVoice;
+      if (prefs.rate !== 1) opts.speed = prefs.rate;
+      const blob = await synthesizeSpeech(trimmed, opts);
+      if (mine !== token) return;
+      try {
+        envelope = typeof blob.arrayBuffer === 'function' ? wavEnvelope(await blob.arrayBuffer()) : null;
+      } catch {
+        envelope = null;
+      }
       if (mine !== token) return;
 
       const url = URL.createObjectURL(blob);
       objectUrl = url;
-      const el = new Audio(url);
+      const el = playbackElement(url);
       audio = el;
 
       el.onended = () => {
@@ -133,11 +334,17 @@ export const useTtsStore = create<TtsStore>((set, get) => ({
       };
 
       await el.play();
-      if (mine === token) set({ state: 'speaking', speakingId: id });
+      if (mine === token) set({ state: 'speaking', speakingId: id, engine: 'server' });
     } catch (err) {
       if (mine !== token) return;
       if (err instanceof DOMException && err.name === 'AbortError') return;
       teardown();
+      // Auto mode: the server voice failed, so say it with the device voice.
+      if (prefs.output === 'auto' && deviceOk) {
+        set({ serverAvailable: false });
+        speakOnDevice(id, trimmed, mine, set);
+        return;
+      }
       set({
         state: 'idle',
         speakingId: null,
@@ -159,12 +366,18 @@ export function __resetTtsForTests(): void {
   teardown();
   token = 0;
   healthProbe = null;
+  unlockedEl = null;
+  unlockInstalled = false;
+  removeUnlockListeners?.();
+  removeUnlockListeners = null;
   useTtsStore.setState({
     state: 'idle',
     speakingId: null,
     error: null,
     errorId: null,
     available: null,
+    serverAvailable: null,
+    engine: null,
     autoSpokenId: null,
   });
 }

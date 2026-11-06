@@ -53,6 +53,7 @@ def _to_messages(chat_messages) -> list[Message]:
                 ]
                 or None,
                 tool_call_id=m.tool_call_id,
+                images=list(getattr(m, "images", None) or []) or None,
             )
         )
     return messages
@@ -155,16 +156,56 @@ def _ensure_identity_prompt(messages: list[Message], app_config) -> list[Message
     return [combined_system, *non_system_messages]
 
 
+def _take_vision_images(request_body: ChatCompletionRequest) -> list[str]:
+    """Detach images from the request; keep only the last user message's."""
+    images: list[str] = []
+    last_user = max(
+        (i for i, m in enumerate(request_body.messages) if m.role == "user"),
+        default=-1,
+    )
+    for i, m in enumerate(request_body.messages):
+        if m.images:
+            if i == last_user:
+                images = list(m.images)
+            m.images = None
+    return images
+
+
+def _restore_vision_images(
+    request_body: ChatCompletionRequest, images: list[str]
+) -> None:
+    """Re-attach images to the last user message (memory injection rebuilds
+    the message list from text)."""
+    for m in reversed(request_body.messages):
+        if m.role == "user":
+            m.images = images
+            return
+
+
 @router.post("/v1/chat/completions")
 async def chat_completions(request_body: ChatCompletionRequest, request: Request):
     """Handle chat completion requests (streaming and non-streaming)."""
     engine = request.app.state.engine
     agent = getattr(request.app.state, "agent", None)
     model = request_body.model
+
+    # Camera vision: only the latest user message may carry images (earlier
+    # turns are text history). Refuse clearly when the engine or model can't
+    # see them, rather than letting the model answer as if it had looked.
+    vision_images = _take_vision_images(request_body)
+    if vision_images:
+        from openjarvis.server.vision import vision_refusal
+
+        refusal = await asyncio.to_thread(vision_refusal, engine, model)
+        if refusal:
+            raise HTTPException(status_code=400, detail=refusal)
+
     use_server_agent = (
         agent is not None
         and not request_body.tools
         and (not request_body.stream or bool(getattr(agent, "_tools", None)))
+        # Agents rebuild prompts from text and would drop the images.
+        and not vision_images
     )
 
     # Inject memory context into messages before dispatching
@@ -173,6 +214,8 @@ async def chat_completions(request_body: ChatCompletionRequest, request: Request
     if (
         config is not None
         and config.agent.context_from_memory
+        # Memory can be switched off from HELL's memory settings.
+        and getattr(request.app.state, "memory_use_in_replies", True)
         and request_body.messages
     ):
         try:
@@ -240,6 +283,9 @@ async def chat_completions(request_body: ChatCompletionRequest, request: Request
                 "Memory context injection failed",
                 exc_info=True,
             )
+
+    if vision_images:
+        _restore_vision_images(request_body, vision_images)
 
     # Run complexity analysis on the last user message
     complexity_info = None

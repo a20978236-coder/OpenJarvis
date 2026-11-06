@@ -1,0 +1,18 @@
+/* HELL Diagnostics. */
+.dg-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.dg-row { padding: 10px 10px 10px 14px; border-radius: 14px; }
+.dg-row[data-status='bad'] { border-color: rgba(255, 107, 129, 0.55); }
+.dg-row[data-status='warn'] { border-color: rgba(255, 181, 71, 0.45); }
+.dg-head { display: flex; align-items: center; gap: 10px; }
+.dg-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--jm-text-3); }
+.dg-row[data-status='ok'] .dg-dot { background: #3ddc97; box-shadow: 0 0 8px rgba(61, 220, 151, 0.6); }
+.dg-row[data-status='warn'] .dg-dot { background: #ffb547; }
+.dg-row[data-status='bad'] .dg-dot { background: #ff6b81; box-shadow: 0 0 8px rgba(255, 107, 129, 0.6); }
+.dg-title { font-size: 15px; font-weight: 650; }
+.dg-summary { font-size: 13.5px; color: var(--jm-text-2); }
+.dg-test { width: auto; min-height: 44px; padding: 0 12px; gap: 6px; flex: none; }
+.dg-more { flex: none; }
+.dg-body { margin: 8px 0 2px 22px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--jm-text-2); }
+.dg-details { list-style: none; display: flex; flex-direction: column; gap: 2px; word-break: break-word; }
+.dg-fix-h { font-weight: 650; color: var(--jm-text); margin-top: 4px; }
+.dg-fixes { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }

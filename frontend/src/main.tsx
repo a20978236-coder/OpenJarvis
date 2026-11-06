@@ -7,7 +7,11 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import App from './App';
 import { initApiBase } from './lib/api';
 import { initAnalytics } from './lib/analytics';
+import { installAudioUnlock } from './lib/tts';
 import './index.css';
+
+// iPhone Safari blocks spoken replies unless audio was unlocked by a tap.
+installAudioUnlock();
 
 function applyTheme() {
   try {

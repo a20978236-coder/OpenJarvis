@@ -3,6 +3,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { handAssetsPlugin } from './scripts/hand-assets.mjs';
+import { compressAssetsPlugin } from './scripts/compress-assets.mjs';
 
 // VITE_SUPABASE_ANON_KEY is intentionally NOT required here: a missing key
 // disables the savings leaderboard at runtime (see src/lib/supabase.ts) rather
@@ -22,23 +24,45 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    handAssetsPlugin(),
+    compressAssetsPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'OpenJarvis',
-        short_name: 'Jarvis',
-        description: 'On-device AI assistant',
-        theme_color: '#161618',
-        background_color: '#161618',
+        name: 'HELL',
+        short_name: 'HELL',
+        description: 'Personal AI assistant',
+        id: '/',
+        // Installed iPhone app opens the mobile UI; desktop stays at '/'.
+        start_url: '/m',
+        scope: '/',
+        theme_color: '#050b1a',
+        background_color: '#050b1a',
         display: 'standalone',
+        orientation: 'portrait',
         icons: [
+          { src: 'apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        navigateFallbackDenylist: [/^\/v1\//, /^\/health/, /^\/dashboard/, /^\/api\//],
+        // Offline: serve the cached app shell for page navigations so the
+        // installed app still opens without a connection (API calls are
+        // excluded below and fail visibly instead of returning HTML).
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/v1\//, /^\/health/, /^\/dashboard/, /^\/api\//, /^\/mediapipe\//],
+        // Hand tracking (~20 MB) is not precached; it's fetched the first time
+        // camera hand gestures are turned on, then kept for offline use.
+        globIgnores: ['mediapipe/**'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/mediapipe/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'hell-hand-tracking', expiration: { maxEntries: 8 } },
+          },
+        ],
       },
     }),
   ],
@@ -50,6 +74,10 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         codeSplitting: {
+          // Only the named packages go into each group; shared helpers they
+          // depend on stay where they are used, so the iPhone dashboard does
+          // not pull in the desktop charts just for a tiny shared utility.
+          includeDependenciesRecursively: false,
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom)[\\/]/ },
             {

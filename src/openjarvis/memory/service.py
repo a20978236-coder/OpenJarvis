@@ -22,8 +22,11 @@ from typing import Any, List, Optional
 
 from openjarvis.core.events import Event, EventBus, EventType
 from openjarvis.memory.extractor import FactExtractor
+from openjarvis.memory.sensitive import PERSONAL, SECRET, classify
 from openjarvis.memory.store import (
     TRUST_AUTO,
+    TRUST_PENDING,
+    TRUST_TRUSTED,
     TRUST_UNTRUSTED,
     Fact,
     FactStore,
@@ -50,8 +53,13 @@ class MemoryService:
         event_bus: EventBus | None = None,
         scanner: Any = None,
         max_queue: int = 256,
+        approval: str = "auto",
     ) -> None:
         self._store = store
+        # "auto": clean facts are recallable at once (personal ones still wait
+        # for approval); "ask": every learned fact waits for approval.
+        self._approval = "ask" if approval == "ask" else "auto"
+        self._paused = False
         self._extractor = extractor
         self._event_bus = event_bus
         self._scanner = scanner
@@ -105,7 +113,7 @@ class MemoryService:
         running or the queue is full (in which case the exchange is dropped
         rather than blocking the caller — extraction is best-effort).
         """
-        if not self._running.is_set():
+        if not self._running.is_set() or self._paused:
             return False
         if not user_text or not user_text.strip():
             return False
@@ -226,11 +234,27 @@ class MemoryService:
         # model-facing path), while clean facts stay recallable — otherwise
         # tagging everything "untrusted" would make automatic memory write-only.
         clean: List[str] = []
+        pending: List[str] = []
         quarantined: List[str] = []
+        dropped = 0
         for fact in facts:
-            target = quarantined if self._flagged(self._scan(fact)) else clean
-            target.append(fact)
+            if self._flagged(self._scan(fact)):
+                quarantined.append(fact)
+                continue
+            level, _reason = classify(fact)
+            if level == SECRET:
+                dropped += 1  # credentials etc. are never memorised
+            elif level == PERSONAL or self._approval == "ask":
+                pending.append(fact)
+            else:
+                clean.append(fact)
+        if dropped:
+            logger.info("Memory: dropped %d fact(s) containing secrets", dropped)
         stored = self._store.add_many_with_trust(clean, source="auto", trust=TRUST_AUTO)
+        if pending:
+            stored += self._store.add_many_with_trust(
+                pending, source="auto", trust=TRUST_PENDING
+            )
         if quarantined:
             stored += self._store.add_many_with_trust(
                 quarantined, source="auto", trust=TRUST_UNTRUSTED
@@ -242,6 +266,48 @@ class MemoryService:
         if stored:
             logger.debug("Memory service stored %d new fact(s)", stored)
 
+    # -- user controls ------------------------------------------------------
+
+    @property
+    def approval(self) -> str:
+        return self._approval
+
+    def set_approval(self, mode: str) -> None:
+        self._approval = "ask" if mode == "ask" else "auto"
+
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    def set_paused(self, paused: bool) -> None:
+        """Stop (or resume) learning from new conversations."""
+        self._paused = bool(paused)
+
+    def approve_fact(self, index: int, expected_text: str) -> bool:
+        """Approve a pending (or quarantined) fact the user reviewed."""
+        return self._store.promote_reviewed(index, expected_text)
+
+    def remember(self, text: str) -> Optional[bool]:
+        """Store a fact the user asked HELL to remember (trusted).
+
+        Returns None when the text contains a secret (never stored), else
+        whether a new fact was stored (False = already known).
+        """
+        text = (text or "").strip()
+        if not text:
+            return False
+        level, _ = classify(text)
+        if level == SECRET:
+            return None
+        if self._store.add_with_trust(text, source="user", trust=TRUST_TRUSTED):
+            return True
+        # Already known: asking to remember it is approval enough.
+        lowered = text.lower()
+        for i, fact in enumerate(self._store.list()):
+            if fact.text.lower() == lowered and not fact.trusted_for_recall:
+                return self._store.promote_reviewed(i, fact.text)
+        return False
+
     # -- store passthroughs -------------------------------------------------
 
     def list_facts(self) -> List[Fact]:
@@ -249,6 +315,9 @@ class MemoryService:
 
     def clear_facts(self) -> int:
         return self._store.clear()
+
+    def forget_fact(self, index: int, expected_text: str) -> bool:
+        return self._store.remove_reviewed(index, expected_text)
 
     def fact_count(self) -> int:
         return self._store.count()
