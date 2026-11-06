@@ -56,7 +56,9 @@ def _index_path() -> Path:
 def _load() -> List[Dict[str, Any]]:
     try:
         data = json.loads(_index_path().read_text(encoding="utf-8"))
-        return [f for f in data if isinstance(f, dict) and _ID.match(str(f.get("id", "")))]
+        return [
+            f for f in data if isinstance(f, dict) and _ID.match(str(f.get("id", "")))
+        ]
     except FileNotFoundError:
         return []
     except Exception:
@@ -87,7 +89,8 @@ def _public(item: Dict[str, Any]) -> Dict[str, Any]:
         "created_at": item["created_at"],
         "in_memory": bool(item.get("memory_ids")),
         "memory_chunks": len(item.get("memory_ids") or []),
-        "can_add_to_memory": Path(item["name"]).suffix.lower() in TEXT_TYPES | DOC_TYPES,
+        "can_add_to_memory": Path(item["name"]).suffix.lower()
+        in TEXT_TYPES | DOC_TYPES,
     }
 
 
@@ -104,7 +107,11 @@ def _find(file_id: str) -> Dict[str, Any]:
 def list_files():
     items = sorted(_load(), key=lambda f: f.get("created_at", 0), reverse=True)
     total = sum(int(f.get("size", 0)) for f in items)
-    return {"files": [_public(f) for f in items], "total_bytes": total, "max_file_bytes": MAX_FILE_BYTES}
+    return {
+        "files": [_public(f) for f in items],
+        "total_bytes": total,
+        "max_file_bytes": MAX_FILE_BYTES,
+    }
 
 
 @files_router.post("", status_code=201)
@@ -112,7 +119,10 @@ async def upload_file(file: UploadFile = File(...)):
     name = _clean_name(file.filename or "")
     with _lock:
         if len(_load()) >= MAX_FILES:
-            raise HTTPException(status_code=409, detail=f"HELL keeps at most {MAX_FILES} files — delete some first")
+            raise HTTPException(
+                status_code=409,
+                detail=f"HELL keeps at most {MAX_FILES} files — delete some first",
+            )
     file_id = uuid.uuid4().hex
     dest = _dir() / file_id
     size = 0
@@ -124,7 +134,12 @@ async def upload_file(file: UploadFile = File(...)):
                     break
                 size += len(chunk)
                 if size > MAX_FILE_BYTES:
-                    raise HTTPException(status_code=413, detail=f"Files can be up to {MAX_FILE_BYTES // (1024 * 1024)} MB")
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            f"Files can be up to {MAX_FILE_BYTES // (1024 * 1024)} MB"
+                        ),
+                    )
                 out.write(chunk)
     except BaseException:
         dest.unlink(missing_ok=True)
@@ -133,7 +148,14 @@ async def upload_file(file: UploadFile = File(...)):
         dest.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail="The file is empty")
     ctype = mimetypes.guess_type(name)[0] or "application/octet-stream"
-    item = {"id": file_id, "name": name, "size": size, "type": ctype, "created_at": time.time(), "memory_ids": []}
+    item = {
+        "id": file_id,
+        "name": name,
+        "size": size,
+        "type": ctype,
+        "created_at": time.time(),
+        "memory_ids": [],
+    }
     with _lock:
         items = _load()
         items.append(item)
@@ -154,7 +176,10 @@ def download_file(file_id: str):
         media_type=ctype,
         filename=item["name"],
         content_disposition_type=disposition,
-        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"},
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+        },
     )
 
 
@@ -198,13 +223,19 @@ def _extract_text(name: str, data: bytes) -> str:
             return data.decode("utf-8")
         except UnicodeDecodeError:
             return data.decode("latin-1")
-    from openjarvis.server.upload_router import _extract_text_from_docx, _extract_text_from_pdf
+    from openjarvis.server.upload_router import (
+        _extract_text_from_docx,
+        _extract_text_from_pdf,
+    )
 
     if ext == ".pdf":
         return _extract_text_from_pdf(data)
     if ext == ".docx":
         return _extract_text_from_docx(data)
-    raise HTTPException(status_code=415, detail="HELL can only read text, Markdown, CSV, JSON, PDF and Word files")
+    raise HTTPException(
+        status_code=415,
+        detail="HELL can only read text, Markdown, CSV, JSON, PDF and Word files",
+    )
 
 
 @files_router.post("/{file_id}/memory")
@@ -215,7 +246,9 @@ def add_to_memory(file_id: str, request: Request):
     item = _find(file_id)
     backend = _memory_backend(request)
     if backend is None:
-        raise HTTPException(status_code=503, detail="Memory is not configured on this server")
+        raise HTTPException(
+            status_code=503, detail="Memory is not configured on this server"
+        )
     data = (_dir() / item["id"]).read_bytes()
     text = _extract_text(item["name"], data).strip()
     if not text:
@@ -230,7 +263,12 @@ def add_to_memory(file_id: str, request: Request):
             backend.store(
                 chunk,
                 source=f"file:{item['name']}",
-                metadata={"source": "hell-files", "file_id": item["id"], "title": item["name"], "chunk": i},
+                metadata={
+                    "source": "hell-files",
+                    "file_id": item["id"],
+                    "title": item["name"],
+                    "chunk": i,
+                },
             )
         )
     with _lock:

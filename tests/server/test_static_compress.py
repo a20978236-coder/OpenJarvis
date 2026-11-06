@@ -10,7 +10,11 @@ fastapi = pytest.importorskip("fastapi")
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from openjarvis.server.static_compress import CompressedAssets, _accepts, compressed_file_response  # noqa: E402
+from openjarvis.server.static_compress import (  # noqa: E402
+    CompressedAssets,
+    _accepts,
+    compressed_file_response,
+)  # noqa: E402
 
 
 @pytest.fixture
@@ -36,10 +40,17 @@ def test_brotli_preferred_then_gzip_then_plain(app_dir):
     c = _client(root)
     r = c.get("/assets/app-abc123.js", headers={"Accept-Encoding": "gzip, br"})
     assert r.headers["content-encoding"] == "br"
-    assert r.headers["content-type"].startswith(("application/javascript", "text/javascript"))
-    assert "immutable" in r.headers["cache-control"] and r.headers["vary"] == "Accept-Encoding"
+    assert r.headers["content-type"].startswith(
+        ("application/javascript", "text/javascript")
+    )
+    assert (
+        "immutable" in r.headers["cache-control"]
+        and r.headers["vary"] == "Accept-Encoding"
+    )
     r = c.get("/assets/app-abc123.js", headers={"Accept-Encoding": "gzip"})
-    assert r.headers["content-encoding"] == "gzip" and r.content == body  # client decodes
+    assert (
+        r.headers["content-encoding"] == "gzip" and r.content == body
+    )  # client decodes
     r = c.get("/assets/app-abc123.js", headers={"Accept-Encoding": "identity"})
     assert "content-encoding" not in r.headers and r.content == body
 
@@ -65,5 +76,8 @@ def test_spa_files_keep_no_cache(tmp_path):
     f.write_text("<html>")
     (tmp_path / "index.html.br").write_bytes(b"x")
     r = compressed_file_response(f, "br", {"Cache-Control": "no-cache"})
-    assert r.headers["content-encoding"] == "br" and r.headers["cache-control"] == "no-cache"
+    assert (
+        r.headers["content-encoding"] == "br"
+        and r.headers["cache-control"] == "no-cache"
+    )
     assert r.media_type == "text/html"

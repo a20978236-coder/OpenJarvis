@@ -9,7 +9,6 @@ import threading
 import time
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from openjarvis.server.analytics_routes import (
@@ -583,8 +582,12 @@ def create_app(
                 # Path traversal prevention
                 resolved_root = static_dir.resolve()
                 if candidate.is_relative_to(resolved_root) and candidate.is_file():
-                    return compressed_file_response(candidate, accept, _NO_CACHE_HEADERS)
-            return compressed_file_response(static_dir / "index.html", accept, _NO_CACHE_HEADERS)
+                    return compressed_file_response(
+                        candidate, accept, _NO_CACHE_HEADERS
+                    )
+            return compressed_file_response(
+                static_dir / "index.html", accept, _NO_CACHE_HEADERS
+            )
 
     return app
 

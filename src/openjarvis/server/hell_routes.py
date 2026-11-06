@@ -236,7 +236,9 @@ async def diagnostics(request: Request):
     # AI engine + models.
     engine = getattr(state, "engine", None)
     ai: Dict[str, Any] = {
-        "engine": getattr(state, "engine_name", "") or getattr(engine, "engine_id", "") or "",
+        "engine": getattr(state, "engine_name", "")
+        or getattr(engine, "engine_id", "")
+        or "",
         "model": getattr(state, "model", "") or "",
         "healthy": False,
         "models": 0,
@@ -259,8 +261,15 @@ async def diagnostics(request: Request):
     t0 = time.perf_counter()
     try:
         async with _client(request) as client:
-            r = await client.get(FORECAST_URL, params={"latitude": 0, "longitude": 0, "current": "temperature_2m"})
-        out["internet"] = {"ok": r.status_code < 500, "latency_ms": round((time.perf_counter() - t0) * 1000), "status": r.status_code}
+            r = await client.get(
+                FORECAST_URL,
+                params={"latitude": 0, "longitude": 0, "current": "temperature_2m"},
+            )
+        out["internet"] = {
+            "ok": r.status_code < 500,
+            "latency_ms": round((time.perf_counter() - t0) * 1000),
+            "status": r.status_code,
+        }
     except Exception as exc:
         out["internet"] = {"ok": False, "error": type(exc).__name__}
 
@@ -270,7 +279,9 @@ async def diagnostics(request: Request):
         from openjarvis.server.api_routes import _get_memory_backend
 
         backend = _get_memory_backend(request)
-        memory["store"] = getattr(backend, "backend_id", "none") if backend is not None else "none"
+        memory["store"] = (
+            getattr(backend, "backend_id", "none") if backend is not None else "none"
+        )
         memory["entries"] = backend.count() if backend is not None else 0
     except Exception as exc:
         memory["store"] = "error"
@@ -279,12 +290,16 @@ async def diagnostics(request: Request):
     memory["learning"] = prefs.get("learning", "off")
     memory["use_in_replies"] = getattr(state, "memory_use_in_replies", True)
     svc = getattr(state, "memory_service", None)
-    memory["learner_running"] = bool(getattr(svc, "is_running", False)) and not bool(getattr(svc, "paused", False))
+    memory["learner_running"] = bool(getattr(svc, "is_running", False)) and not bool(
+        getattr(svc, "paused", False)
+    )
     out["memory"] = memory
 
     # Voice engines (no model is loaded by this check).
     stt = getattr(state, "speech_backend", None)
-    voice: Dict[str, Any] = {"stt": getattr(stt, "backend_id", "") if stt is not None else ""}
+    voice: Dict[str, Any] = {
+        "stt": getattr(stt, "backend_id", "") if stt is not None else ""
+    }
     if getattr(state, "tts_resolved", False):
         tts = getattr(state, "tts_backend", None)
         voice["tts"] = getattr(tts, "backend_id", "") if tts is not None else ""

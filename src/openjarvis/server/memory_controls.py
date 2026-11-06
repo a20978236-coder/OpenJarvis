@@ -94,9 +94,18 @@ def _build_service(app: Any) -> Any:
         max_facts=getattr(mem, "max_facts", 1000) if mem is not None else 1000,
     )
     engine = getattr(app.state, "engine", None)
-    model = (getattr(mem, "extraction_model", "") if mem is not None else "") or getattr(app.state, "model", "") or ""
+    model = (
+        (getattr(mem, "extraction_model", "") if mem is not None else "")
+        or getattr(app.state, "model", "")
+        or ""
+    )
     extractor = FactExtractor(engine, model) if engine is not None and model else None
-    svc = MemoryService(store, extractor, event_bus=getattr(app.state, "bus", None), scanner=_build_scanner())
+    svc = MemoryService(
+        store,
+        extractor,
+        event_bus=getattr(app.state, "bus", None),
+        scanner=_build_scanner(),
+    )
     svc._hell_can_learn = extractor is not None  # type: ignore[attr-defined]
     return svc
 
@@ -157,7 +166,9 @@ def _service(request: Request, create: bool = False) -> Any:
         try:
             svc = _build_service(app)
         except Exception as exc:
-            raise HTTPException(status_code=503, detail=f"Memory store unavailable: {exc}") from exc
+            raise HTTPException(
+                status_code=503, detail=f"Memory store unavailable: {exc}"
+            ) from exc
         app.state.memory_service = svc
         _apply(app, svc, _prefs(request))
     return svc
@@ -194,7 +205,9 @@ def get_memory_settings(request: Request):
     if svc is not None:
         can_learn = _can_learn(svc)
     else:
-        can_learn = bool(getattr(request.app.state, "engine", None)) and bool(getattr(request.app.state, "model", ""))
+        can_learn = bool(getattr(request.app.state, "engine", None)) and bool(
+            getattr(request.app.state, "model", "")
+        )
     return {
         "learning": prefs["learning"],
         "use_in_replies": bool(prefs["use_in_replies"]),
@@ -215,17 +228,25 @@ def put_memory_settings(body: MemorySettingsUpdate, request: Request):
     prefs = dict(_prefs(request))
     if body.learning is not None:
         if body.learning not in LEARNING_MODES:
-            raise HTTPException(status_code=422, detail=f"learning must be one of {', '.join(LEARNING_MODES)}")
+            raise HTTPException(
+                status_code=422,
+                detail=f"learning must be one of {', '.join(LEARNING_MODES)}",
+            )
         prefs["learning"] = body.learning
     if body.use_in_replies is not None:
         prefs["use_in_replies"] = body.use_in_replies
     svc = _service(request, create=prefs["learning"] != "off")
     if prefs["learning"] != "off" and svc is not None and not _can_learn(svc):
-        raise HTTPException(status_code=409, detail="No AI model is available to learn from conversations")
+        raise HTTPException(
+            status_code=409,
+            detail="No AI model is available to learn from conversations",
+        )
     try:
         save_prefs(prefs)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Could not save memory settings: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Could not save memory settings: {exc}"
+        ) from exc
     prefs["saved"] = True
     _apply(request.app, svc, prefs)
     return get_memory_settings(request)
@@ -242,7 +263,10 @@ def approve_fact(body: FactRef, request: Request):
     if svc is None:
         raise HTTPException(status_code=503, detail="Memory is off")
     if not svc.approve_fact(body.index, body.text):
-        raise HTTPException(status_code=409, detail="That memory changed or is already approved — refresh and try again")
+        raise HTTPException(
+            status_code=409,
+            detail="That memory changed or is already approved — refresh and try again",
+        )
     return {"status": "approved"}
 
 
@@ -255,7 +279,13 @@ def remember_fact(body: RememberRequest, request: Request):
     svc = _service(request, create=True)
     result = svc.remember(body.text)
     if result is None:
-        raise HTTPException(status_code=422, detail="That looks like a password, key or card number. HELL never stores secrets.")
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "That looks like a password, key or card number. "
+                "HELL never stores secrets."
+            ),
+        )
     return {"status": "stored" if result else "already_known"}
 
 

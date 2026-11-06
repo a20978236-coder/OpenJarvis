@@ -172,9 +172,17 @@ def test_diagnostics_reports_server_side_state(monkeypatch):
     app.state.engine_name = "ollama"
     app.state.model = "qwen3:8b"
     app.state.memory_prefs = {"learning": "ask"}
-    app.state.hell_http_transport = httpx.MockTransport(lambda req: httpx.Response(200, json={}))
+    app.state.hell_http_transport = httpx.MockTransport(
+        lambda req: httpx.Response(200, json={})
+    )
     body = TestClient(app).get("/v1/hell/diagnostics").json()
-    assert body["ai"] == {"engine": "ollama", "model": "qwen3:8b", "healthy": True, "models": 2, "latency_ms": body["ai"]["latency_ms"]}
+    assert body["ai"] == {
+        "engine": "ollama",
+        "model": "qwen3:8b",
+        "healthy": True,
+        "models": 2,
+        "latency_ms": body["ai"]["latency_ms"],
+    }
     assert body["internet"]["ok"] is True
     assert body["memory"]["learning"] == "ask"
     assert body["voice"] == {"stt": "", "tts": None}

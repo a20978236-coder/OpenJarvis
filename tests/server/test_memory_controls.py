@@ -11,7 +11,11 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from openjarvis.memory.service import MemoryService  # noqa: E402
-from openjarvis.memory.store import TRUST_AUTO, TRUST_PENDING, LocalFactStore  # noqa: E402
+from openjarvis.memory.store import (  # noqa: E402
+    TRUST_AUTO,
+    TRUST_PENDING,
+    LocalFactStore,
+)
 from openjarvis.server import memory_controls  # noqa: E402
 from openjarvis.server.api_routes import include_all_routes  # noqa: E402
 from openjarvis.server.memory_controls import (  # noqa: E402
@@ -40,7 +44,12 @@ def _app(tmp_path, svc=None, *, engine=None, model=""):
     app.include_router(memory_controls_router)
     include_all_routes(app)
     app.state.config = SimpleNamespace(
-        memory=SimpleNamespace(backend="local", facts_path=str(tmp_path / "facts.jsonl"), max_facts=100, extraction_model="")
+        memory=SimpleNamespace(
+            backend="local",
+            facts_path=str(tmp_path / "facts.jsonl"),
+            max_facts=100,
+            extraction_model="",
+        )
     )
     app.state.engine = engine
     app.state.model = model
@@ -59,23 +68,40 @@ def test_ask_mode_keeps_learned_facts_pending_until_approved(tmp_path):
     facts = store.list()
     assert facts[0].trust == TRUST_PENDING and not facts[0].trusted_for_recall
     assert c.get("/v1/memory/settings").json()["facts"]["pending"] == 1
-    r = c.post("/v1/memory/facts/approve", json={"index": 0, "text": "User prefers dark mode"})
+    r = c.post(
+        "/v1/memory/facts/approve", json={"index": 0, "text": "User prefers dark mode"}
+    )
     assert r.status_code == 200
     assert store.list()[0].trusted_for_recall
     # Approving again is a conflict, not a silent success.
-    assert c.post("/v1/memory/facts/approve", json={"index": 0, "text": "User prefers dark mode"}).status_code == 409
+    assert (
+        c.post(
+            "/v1/memory/facts/approve",
+            json={"index": 0, "text": "User prefers dark mode"},
+        ).status_code
+        == 409
+    )
 
 
 def test_auto_mode_still_holds_personal_details_and_drops_secrets(tmp_path):
     store = LocalFactStore(tmp_path / "facts.jsonl")
     svc = MemoryService(
         store,
-        FakeExtractor(["User prefers tea", "User was diagnosed with asthma", "User's password is hunter2"]),
+        FakeExtractor(
+            [
+                "User prefers tea",
+                "User was diagnosed with asthma",
+                "User's password is hunter2",
+            ]
+        ),
         approval="auto",
     )
     svc._process(("...", ""))
     by_text = {f.text: f.trust for f in store.list()}
-    assert by_text == {"User prefers tea": TRUST_AUTO, "User was diagnosed with asthma": TRUST_PENDING}
+    assert by_text == {
+        "User prefers tea": TRUST_AUTO,
+        "User was diagnosed with asthma": TRUST_PENDING,
+    }
 
 
 def test_relearning_an_approved_fact_does_not_demote_it(tmp_path):
@@ -110,7 +136,9 @@ def test_switching_learning_off_and_on_persists(tmp_path, prefs_file):
     store = LocalFactStore(tmp_path / "facts.jsonl")
     svc = MemoryService(store, FakeExtractor(["x"]))
     app, c = _app(tmp_path, svc)
-    body = c.put("/v1/memory/settings", json={"learning": "off", "use_in_replies": False}).json()
+    body = c.put(
+        "/v1/memory/settings", json={"learning": "off", "use_in_replies": False}
+    ).json()
     assert body["learning"] == "off" and body["use_in_replies"] is False
     assert svc.paused and app.state.memory_use_in_replies is False
     assert prefs_file.exists()

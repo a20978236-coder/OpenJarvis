@@ -35,16 +35,25 @@ def _accepts(accept_encoding: str) -> set:
     return out
 
 
-def compressed_file_response(path: Path, accept_encoding: str, headers: Optional[Mapping[str, str]] = None) -> FileResponse:
+def compressed_file_response(
+    path: Path, accept_encoding: str, headers: Optional[Mapping[str, str]] = None
+) -> FileResponse:
     """FileResponse for *path*, or its pre-compressed copy when accepted."""
     media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    base: Dict[str, str] = {"Vary": "Accept-Encoding", **(dict(headers) if headers else {})}
+    base: Dict[str, str] = {
+        "Vary": "Accept-Encoding",
+        **(dict(headers) if headers else {}),
+    }
     ok = _accepts(accept_encoding)
     for enc, ext in _ENCODINGS:
         if enc in ok:
             candidate = path.with_name(path.name + ext)
             if candidate.is_file():
-                return FileResponse(candidate, media_type=media_type, headers={**base, "Content-Encoding": enc})
+                return FileResponse(
+                    candidate,
+                    media_type=media_type,
+                    headers={**base, "Content-Encoding": enc},
+                )
     return FileResponse(path, media_type=media_type, headers=base)
 
 

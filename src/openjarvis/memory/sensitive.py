@@ -25,29 +25,82 @@ SECRET = "secret"
 PERSONAL = "personal"
 
 _SECRET_PATTERNS: List[Tuple[str, "re.Pattern[str]"]] = [
-    ("password", re.compile(r"\b(pass(word|code|phrase)?|pwd|pin( code)?)\b\s*(is|=|:|was)\s*\S+", re.I)),
+    (
+        "password",
+        re.compile(
+            r"\b(pass(word|code|phrase)?|pwd|pin( code)?)\b\s*(is|=|:|was)\s*\S+", re.I
+        ),
+    ),
     ("private key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
     ("API key", re.compile(r"\b(sk|pk|rk)-[A-Za-z0-9_-]{16,}")),
     ("API key", re.compile(r"\b(ghp|gho|ghu|ghs|github_pat)_[A-Za-z0-9_]{20,}")),
     ("API key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("API key", re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{10,}")),
     ("API key", re.compile(r"\bAIza[0-9A-Za-z_-]{30,}")),
-    ("token", re.compile(r"\b(api[_ -]?key|secret|token|bearer)\b\s*(is|=|:)\s*[A-Za-z0-9_\-.]{12,}", re.I)),
-    ("social security number", re.compile(r"\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b")),
-    ("IBAN", re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,3})?\b")),
+    (
+        "token",
+        re.compile(
+            r"\b(api[_ -]?key|secret|token|bearer)\b\s*(is|=|:)\s*[A-Za-z0-9_\-.]{12,}",
+            re.I,
+        ),
+    ),
+    (
+        "social security number",
+        re.compile(r"\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b"),
+    ),
+    (
+        "IBAN",
+        re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,3})?\b"),
+    ),
 ]
 
 _CARD_CANDIDATE = re.compile(r"\b(?:\d[ -]?){13,19}\b")
 
 _PERSONAL_PATTERNS: List[Tuple[str, "re.Pattern[str]"]] = [
     ("email address", re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")),
-    ("phone number", re.compile(r"(?<!\d)(?<!\d )(\+\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?! ?\d)")),
-    ("phone number", re.compile(r"\b(phone|mobile|cell)( number)?\b.{0,12}\d{3}", re.I)),
-    ("home address", re.compile(r"\b(i live (at|on|in)|my (home )?address|lives? at)\b", re.I)),
-    ("health", re.compile(r"\b(diagnos\w*|disease|disorder|illness|medication|medicine|prescri\w+|therap\w+|pregnan\w+|allerg\w+|diabet\w+|cancer|hiv|depress\w+|anxiety|adhd|autis\w+|surgery|blood pressure|mental health)\b", re.I)),
-    ("finances", re.compile(r"\b(salary|income|debt|loan|mortgage|bank account|account number|credit score|net worth)\b", re.I)),
-    ("government ID", re.compile(r"\b(passport|driver'?s licen[cs]e|national id|tax id|ssn)\b", re.I)),
-    ("beliefs", re.compile(r"\b(religio\w+|political (party|views?)|sexual orientation)\b", re.I)),
+    (
+        "phone number",
+        re.compile(
+            r"(?<!\d)(?<!\d )(\+\d{1,3}[\s.-]?)?"
+            r"\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?! ?\d)"
+        ),
+    ),
+    (
+        "phone number",
+        re.compile(r"\b(phone|mobile|cell)( number)?\b.{0,12}\d{3}", re.I),
+    ),
+    (
+        "home address",
+        re.compile(r"\b(i live (at|on|in)|my (home )?address|lives? at)\b", re.I),
+    ),
+    (
+        "health",
+        re.compile(
+            r"\b(diagnos\w*|disease|disorder|illness|medication|medicine|"
+            r"prescri\w+|therap\w+|pregnan\w+|allerg\w+|diabet\w+|cancer|hiv|"
+            r"depress\w+|anxiety|adhd|autis\w+|surgery|blood pressure|"
+            r"mental health)\b",
+            re.I,
+        ),
+    ),
+    (
+        "finances",
+        re.compile(
+            r"\b(salary|income|debt|loan|mortgage|bank account|account number|"
+            r"credit score|net worth)\b",
+            re.I,
+        ),
+    ),
+    (
+        "government ID",
+        re.compile(r"\b(passport|driver'?s licen[cs]e|national id|tax id|ssn)\b", re.I),
+    ),
+    (
+        "beliefs",
+        re.compile(
+            r"\b(religio\w+|political (party|views?)|sexual orientation)\b", re.I
+        ),
+    ),
 ]
 
 

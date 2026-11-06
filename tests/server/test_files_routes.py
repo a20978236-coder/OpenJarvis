@@ -48,7 +48,9 @@ def test_upload_list_download_delete(client, tmp_path):
     r = up(client, "notes.md", b"# Trip\nBook the train.")
     assert r.status_code == 201
     f = r.json()
-    assert f["name"] == "notes.md" and f["size"] == 22 and f["can_add_to_memory"] is True
+    assert (
+        f["name"] == "notes.md" and f["size"] == 22 and f["can_add_to_memory"] is True
+    )
     assert (tmp_path / f["id"]).read_bytes() == b"# Trip\nBook the train."
     listing = client.get("/v1/hell/files").json()
     assert [x["id"] for x in listing["files"]] == [f["id"]]
