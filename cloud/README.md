@@ -43,7 +43,8 @@ In your GitHub repository (github.com → your HELL repository):
 1. **Settings** → **Secrets and variables** → **Actions** → **New repository
    secret**.
 2. Add `CLOUDFLARE_API_TOKEN` = the token from step 2.
-3. Add `CLOUDFLARE_ACCOUNT_ID` = the Account ID from step 1.
+3. Put your Account ID from step 1 in `cloud/wrangler.jsonc` as
+   `account_id` (it is an ID, not a secret).
 4. Open the **Actions** tab. If GitHub asks, tap **I understand my workflows,
    go ahead and enable them**.
 

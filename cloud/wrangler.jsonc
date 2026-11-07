@@ -1,10 +1,12 @@
 // HELL on Cloudflare: one Worker serves the iPhone app (static files) and
 // the small API that keeps secrets off the phone. Deployed by GitHub Actions
-// (.github/workflows/hell-cloud.yml); secrets are set in the Cloudflare
+// (.github/workflows/cloud.yml); secrets are set in the Cloudflare
 // dashboard (see cloud/README.md), never in this file.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hell",
+  // Your Cloudflare account (an ID, not a secret).
+  "account_id": "87b7816e263c5e9466d675801800ccbe",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "assets": {

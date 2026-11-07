@@ -1,9 +1,9 @@
 name: HELL Cloud (Cloudflare)
 
 # Tests the HELL Worker on every change, and deploys HELL to Cloudflare when
-# `main` changes (or when you press "Run workflow"). Deploying needs two
-# repository secrets — CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (see
-# cloud/README.md). Without them the deploy step is skipped, not failed.
+# `main` changes (or when you press "Run workflow"). Deploying needs one
+# repository secret, CLOUDFLARE_API_TOKEN (see cloud/README.md); the account
+# is set in cloud/wrangler.jsonc. Without the secret the deploy is skipped.
 
 on:
   push:
@@ -67,11 +67,10 @@ jobs:
         working-directory: cloud
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_SEND_METRICS: 'false'
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::notice::Cloudflare secrets are not set, so HELL was tested but not deployed. See cloud/README.md."
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::The CLOUDFLARE_API_TOKEN secret is not set, so HELL was tested but not deployed. See cloud/README.md."
             exit 0
           fi
           npx wrangler deploy
