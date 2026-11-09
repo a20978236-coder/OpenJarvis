@@ -84,3 +84,27 @@ describe('error log', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('HELL cloud (no home server)', () => {
+  it('reports cloud AI as not set up yet, not as a broken server', () => {
+    const c = aiCheck({ serverReachable: true, latencyMs: 40, ai: { engine: 'cloud', model: '', healthy: false, models: 0, latency_ms: null, configured: false } });
+    expect(c.status).toBe('warn');
+    expect(c.summary).toBe('Cloud AI not set up yet');
+    expect(c.fixes.join(' ')).not.toMatch(/jarvis serve|ollama/);
+  });
+
+  it('points to the iPhone speech setting, not server installs', () => {
+    const off = voiceCheck({ stt: '', tts: null, ttsServer: false, deviceVoices: true, deviceRec: true, deviceRecAllowed: false, cloud: true });
+    expect(off.status).toBe('bad');
+    expect(off.details).toContain('Listening: iPhone speech recognition is switched off');
+    expect(off.fixes.join(' ')).toMatch(/Allow iPhone speech recognition/);
+    expect(off.fixes.join(' ')).not.toMatch(/faster-whisper|Kokoro/);
+    const on = voiceCheck({ stt: '', tts: null, ttsServer: false, deviceVoices: true, deviceRec: true, deviceRecAllowed: true, cloud: true });
+    expect(on.status).toBe('ok');
+  });
+
+  it('explains where memory is going', () => {
+    expect(memoryCheck(null, 0, true).summary).toMatch(/phone/);
+    expect(memoryCheck(null, 0).summary).toBe('Not checked');
+  });
+});

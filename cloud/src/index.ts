@@ -89,12 +89,36 @@ async function session(request: Request, env: Env, limiter: Limiter): Promise<Re
   return json({ auth_required: true, authenticated: true }, 200, { 'Set-Cookie': sessionCookie(token) });
 }
 
+/**
+ * What the cloud side can see, in the same shape as the home server's
+ * /v1/hell/diagnostics. Cloud AI (Claude) arrives in phase 4, so it is
+ * reported as "not set up" rather than broken; memory now lives on the
+ * phone, so the section is left out.
+ */
+async function diagnostics(probe: () => Promise<Response> = () => fetch('https://cloudflare.com/cdn-cgi/trace')) {
+  const t0 = Date.now();
+  let internet: { ok: boolean; latency_ms?: number; error?: string };
+  try {
+    const r = await probe();
+    internet = { ok: r.ok, latency_ms: Date.now() - t0 };
+  } catch (e) {
+    internet = { ok: false, error: e instanceof Error ? e.name : 'Error' };
+  }
+  return {
+    hell: 'cloud',
+    ai: { engine: 'cloud', model: '', healthy: false, models: 0, latency_ms: null, configured: false },
+    internet,
+    voice: { stt: '', tts: null },
+  };
+}
+
 export async function handle(request: Request, env: Env, limiter: Limiter): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === '/health') return json({ status: 'ok', hell: 'cloud' });
   if (url.pathname === SESSION_PATH) return session(request, env, limiter);
   if (url.pathname.startsWith('/v1/')) {
     if (!(await authenticated(request, env))) return json({ detail: 'Sign in to HELL first' }, 401);
+    if (url.pathname === '/v1/hell/diagnostics' && request.method === 'GET') return json(await diagnostics());
     // Routes for later phases (cloud AI, weather, vision, reminders) go here.
     return json({ detail: 'Not available in HELL cloud yet' }, 404);
   }

@@ -75,6 +75,18 @@ describe('HELL Worker', () => {
     expect(await verifyToken('y'.repeat(40), fresh)).toBe(false);
   });
 
+  it('reports cloud diagnostics to signed-in users only', async () => {
+    expect((await handle(req('/v1/hell/diagnostics'), env(), memoryLimiter())).status).toBe(401);
+    const good = await issueToken(SECRET);
+    const r = await handle(req('/v1/hell/diagnostics', { cookie: `${COOKIE_NAME}=${good}` }), env(), memoryLimiter());
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { hell: string; ai: { configured: boolean; healthy: boolean }; voice: unknown; internet: unknown };
+    expect(body.hell).toBe('cloud');
+    expect(body.ai).toMatchObject({ engine: 'cloud', configured: false, healthy: false });
+    expect(body.voice).toEqual({ stt: '', tts: null });
+    expect(body.internet).toBeTypeOf('object');
+  });
+
   it('sign-out clears the cookie', async () => {
     const r = await handle(req('/v1/auth/session', { method: 'DELETE' }), env(), memoryLimiter());
     expect(r.status).toBe(204);

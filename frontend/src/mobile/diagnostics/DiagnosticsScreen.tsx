@@ -40,7 +40,8 @@ async function permission(name: string): Promise<Perm> {
 }
 
 interface ServerDiag {
-  ai: { engine: string; model: string; healthy: boolean; models: number; latency_ms: number | null; error?: string };
+  hell?: string;
+  ai: { engine: string; model: string; healthy: boolean; models: number; latency_ms: number | null; error?: string; configured?: boolean };
   internet: { ok: boolean; latency_ms?: number; error?: string };
   memory: { store: string; entries: number; learning: string; use_in_replies: boolean; learner_running: boolean; error?: string };
   voice: { stt: string; tts: string | null };
@@ -159,6 +160,7 @@ export function DiagnosticsScreen() {
       const b = (await res.json()) as Partial<ServerDiag> | null;
       // Older or partial servers: only use the sections that are really there.
       setServer({
+        hell: typeof b?.hell === 'string' ? b.hell : undefined,
         ai: b?.ai && typeof b.ai === 'object' ? b.ai : (null as unknown as ServerDiag['ai']),
         internet: b?.internet && typeof b.internet === 'object' ? b.internet : (null as unknown as ServerDiag['internet']),
         memory: b?.memory && typeof b.memory === 'object' ? b.memory : (null as unknown as ServerDiag['memory']),
@@ -235,8 +237,8 @@ export function DiagnosticsScreen() {
     cameraCheck({ supported: media, secure, permission: cam.perm, test: cam.test }),
     internetCheck({ browserOnline: typeof navigator === 'undefined' || navigator.onLine, server: server?.internet ?? null, serverReachable: serverReachable && online !== false }),
     aiCheck({ serverReachable: serverReachable && online !== false, latencyMs: serverLatencyMs, ai: server?.ai ?? null }),
-    voiceCheck({ stt: stt || server?.voice?.stt || '', tts: server?.voice?.tts ?? null, ttsServer, deviceVoices: deviceVoicesSupported(), deviceRec: deviceRecognitionSupported(), deviceRecAllowed: voicePrefs.allowDeviceRecognition }),
-    memoryCheck(server?.memory ?? null, pending),
+    voiceCheck({ stt: stt || server?.voice?.stt || '', tts: server?.voice?.tts ?? null, ttsServer, deviceVoices: deviceVoicesSupported(), deviceRec: deviceRecognitionSupported(), deviceRecAllowed: voicePrefs.allowDeviceRecognition, cloud: server?.hell === 'cloud' }),
+    memoryCheck(server?.memory ?? null, pending, server?.hell === 'cloud'),
     gestureCheck({ touch, wasm: typeof WebAssembly !== 'undefined', handModel, cameraOk: secure && media && cam.perm !== 'denied' }),
     renderCheck({ ...gl, fps, dpr: window.devicePixelRatio || 1, reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false }),
     errorsCheck(errors),

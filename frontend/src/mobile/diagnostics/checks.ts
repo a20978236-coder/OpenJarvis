@@ -58,8 +58,14 @@ export function internetCheck(p: { browserOnline: boolean; server: { ok: boolean
   return r('internet', t, 'warn', 'Your HELL server has no internet', [p.server.error ?? ''].filter(Boolean), ['HELL still works locally; weather and web tools need the server to reach the internet.', 'Check the server computer’s network or firewall.']);
 }
 
-export function aiCheck(p: { serverReachable: boolean; latencyMs: number | null; ai: { engine: string; model: string; healthy: boolean; models: number; latency_ms: number | null; error?: string } | null }): CheckResult {
+export function aiCheck(p: { serverReachable: boolean; latencyMs: number | null; ai: { engine: string; model: string; healthy: boolean; models: number; latency_ms: number | null; error?: string; configured?: boolean } | null }): CheckResult {
   const t = 'AI service';
+  if (p.serverReachable && p.ai?.engine === 'cloud' && p.ai.configured === false) {
+    return r('ai', t, 'warn', 'Cloud AI not set up yet', p.latencyMs != null ? [`HELL cloud round trip ${p.latencyMs} ms`] : [], [
+      'HELL’s cloud AI (Claude) is the next update; its key will stay in Cloudflare, never on the phone.',
+      'Meanwhile, try AI Modules › On-phone AI · test.',
+    ]);
+  }
   if (!p.serverReachable) {
     return r('ai', t, 'bad', 'Can’t reach your HELL server', [], ['Make sure the computer running HELL is on and `jarvis serve` is running.', 'Check the iPhone is on the same network (or your VPN/tunnel is up).', 'Try opening the HELL address in Safari.']);
   }
@@ -71,23 +77,35 @@ export function aiCheck(p: { serverReachable: boolean; latencyMs: number | null;
   return r('ai', t, 'ok', 'Connected', details);
 }
 
-export function voiceCheck(p: { stt: string; tts: string | null; ttsServer: boolean | null; deviceVoices: boolean; deviceRec: boolean; deviceRecAllowed: boolean }): CheckResult {
+export function voiceCheck(p: { stt: string; tts: string | null; ttsServer: boolean | null; deviceVoices: boolean; deviceRec: boolean; deviceRecAllowed: boolean; cloud?: boolean }): CheckResult {
   const t = 'Voice engine';
-  const listen = p.stt ? `Listening: HELL server (${p.stt})` : p.deviceRec && p.deviceRecAllowed ? 'Listening: iPhone speech recognition' : 'Listening: unavailable';
+  const listen = p.stt
+    ? `Listening: HELL server (${p.stt})`
+    : p.deviceRec && p.deviceRecAllowed
+      ? 'Listening: iPhone speech recognition'
+      : p.deviceRec
+        ? 'Listening: iPhone speech recognition is switched off'
+        : 'Listening: unavailable';
   const speakServer = p.ttsServer === true || !!p.tts;
   const speak = speakServer ? `Speaking: HELL server${p.tts ? ` (${p.tts})` : ''}` : p.deviceVoices ? 'Speaking: iPhone voice' : 'Speaking: unavailable';
   const canListen = !!p.stt || (p.deviceRec && p.deviceRecAllowed);
   const canSpeak = speakServer || p.deviceVoices;
   const fixes: string[] = [];
-  if (!p.stt) fixes.push('For private voice input, install a transcriber on the server: `pip install faster-whisper` then restart `jarvis serve`.');
-  if (!p.stt && p.deviceRec && !p.deviceRecAllowed) fixes.push('Or allow iPhone speech recognition in Settings › Voice.');
-  if (!speakServer) fixes.push('For HELL’s own voice, install Kokoro on the server (free, local); until then the iPhone voice is used.');
-  const status: Status = canListen && canSpeak ? (p.stt && speakServer ? 'ok' : 'warn') : 'bad';
+  if (p.cloud) {
+    if (!p.stt && p.deviceRec && !p.deviceRecAllowed) fixes.push('Turn on Settings › Voice › Allow iPhone speech recognition (Apple may process the audio on its servers).');
+  } else {
+    if (!p.stt) fixes.push('For private voice input, install a transcriber on the server: `pip install faster-whisper` then restart `jarvis serve`.');
+    if (!p.stt && p.deviceRec && !p.deviceRecAllowed) fixes.push('Or allow iPhone speech recognition in Settings › Voice.');
+    if (!speakServer) fixes.push('For HELL’s own voice, install Kokoro on the server (free, local); until then the iPhone voice is used.');
+  }
+  // In the cloud the iPhone's own engines are the intended ones.
+  const status: Status = canListen && canSpeak ? ((p.stt && speakServer) || p.cloud ? 'ok' : 'warn') : 'bad';
   return r('voice', t, status, canListen && canSpeak ? 'Ready' : !canListen ? 'HELL can’t listen' : 'HELL can’t speak', [listen, speak], status === 'ok' ? [] : fixes);
 }
 
-export function memoryCheck(m: { store: string; entries: number; learning: string; use_in_replies: boolean; learner_running: boolean; error?: string } | null, pending: number): CheckResult {
+export function memoryCheck(m: { store: string; entries: number; learning: string; use_in_replies: boolean; learner_running: boolean; error?: string } | null, pending: number, cloud = false): CheckResult {
   const t = 'Memory system';
+  if (!m && cloud) return r('memory', t, 'unknown', 'Moves onto your phone in an upcoming update', [], ['Until then, memory is not available in HELL cloud.']);
   if (!m) return r('memory', t, 'unknown', 'Not checked');
   if (m.store === 'error') return r('memory', t, 'bad', 'Memory store failed', [m.error ?? ''], ['Restart `jarvis serve`; if it persists, reinstall HELL’s native extension.']);
   const details = [`Saved entries: ${m.entries}`, `Learning: ${m.learning === 'ask' ? 'asks first' : m.learning}`, `Used in replies: ${m.use_in_replies ? 'yes' : 'no'}`];
