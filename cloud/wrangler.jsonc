@@ -9,6 +9,8 @@
   "account_id": "87b7816e263c5e9466d675801800ccbe",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
+  // Serve HELL at https://hell.<your-subdomain>.workers.dev
+  "workers_dev": true,
   "assets": {
     // Built by: HELL_TARGET=cloudflare npm run build (in frontend/)
     "directory": "./public",
