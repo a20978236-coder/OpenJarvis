@@ -13,6 +13,12 @@
   "workers_dev": true,
   // No extra per-version preview addresses: HELL has one public address.
   "preview_urls": false,
+  // Daily cloud-AI spending total (see src/ai.ts). Free tier.
+  "kv_namespaces": [{ "binding": "USAGE", "id": "98ab27ebbfb54444a19cf368303f563d" }],
+  "vars": {
+    // Most HELL may spend on Claude per day, in US dollars. Change and redeploy.
+    "DAILY_LIMIT_USD": "1"
+  },
   "assets": {
     // Built by: HELL_TARGET=cloudflare npm run build (in frontend/)
     "directory": "./public",

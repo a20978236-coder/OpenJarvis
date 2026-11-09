@@ -23,6 +23,9 @@ const apiTarget = process.env.OPENJARVIS_VITE_PROXY_TARGET
 const cloudflare = process.env.HELL_TARGET === 'cloudflare';
 
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_HELL_CLOUD': JSON.stringify(cloudflare ? '1' : ''),
+  },
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),

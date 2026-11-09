@@ -39,7 +39,10 @@ export const DEFAULT_VOICE_PREFS: VoicePrefs = {
   deviceVoice: '',
   rate: 1,
   input: 'auto',
-  allowDeviceRecognition: false,
+  // HELL cloud has no transcriber of its own, so the iPhone's recognition is
+  // the only way to listen there: on by default (switch off in Settings >
+  // Voice). With a home server it stays off, keeping voice on your network.
+  allowDeviceRecognition: import.meta.env.VITE_HELL_CLOUD === '1',
   autoStop: true,
   continueConversation: true,
   wakePhrase: false,

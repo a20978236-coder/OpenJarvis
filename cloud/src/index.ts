@@ -6,12 +6,14 @@
  * changes to its screens:
  *   GET  /health               — liveness (no sign-in needed)
  *   /v1/auth/session           — passcode sign-in (see session.ts)
- *   /v1/*                      — everything else requires a session; routes
- *                                arrive in later phases (cloud AI, weather…)
+ *   /v1/chat/completions, /v1/models, /v1/info — cloud AI (see ai.ts)
+ *   /v1/hell/diagnostics       — status for the Diagnostics screen
+ *   /v1/*                      — everything requires a session
  *
  * Secrets (set in the Cloudflare dashboard, never in code):
  *   HELL_PASSCODE   — the passcode you type on the iPhone (8+ characters)
  *   SESSION_SECRET  — 32+ random characters that sign session cookies
+ *   ANTHROPIC_API_KEY — your Claude key (optional until you want cloud AI)
  */
 import {
   cacheLimiter,
@@ -25,8 +27,9 @@ import {
   verifyToken,
   type Limiter,
 } from './session';
+import { aiConfigured, aiStatus, chatCompletions, CLOUD_MODEL, modelList, type AiDeps, type AiEnv } from './ai';
 
-export interface Env {
+export interface Env extends AiEnv {
   ASSETS: Fetcher;
   HELL_PASSCODE?: string;
   SESSION_SECRET?: string;
@@ -95,7 +98,7 @@ async function session(request: Request, env: Env, limiter: Limiter): Promise<Re
  * reported as "not set up" rather than broken; memory now lives on the
  * phone, so the section is left out.
  */
-async function diagnostics(probe: () => Promise<Response> = () => fetch('https://cloudflare.com/cdn-cgi/trace')) {
+async function diagnostics(env: Env, deps: AiDeps, probe: () => Promise<Response> = () => fetch('https://cloudflare.com/cdn-cgi/trace')) {
   const t0 = Date.now();
   let internet: { ok: boolean; latency_ms?: number; error?: string };
   try {
@@ -106,28 +109,33 @@ async function diagnostics(probe: () => Promise<Response> = () => fetch('https:/
   }
   return {
     hell: 'cloud',
-    ai: { engine: 'cloud', model: '', healthy: false, models: 0, latency_ms: null, configured: false },
+    ai: await aiStatus(env, deps),
     internet,
     voice: { stt: '', tts: null },
   };
 }
 
-export async function handle(request: Request, env: Env, limiter: Limiter): Promise<Response> {
+export async function handle(request: Request, env: Env, limiter: Limiter, deps: AiDeps = {}): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === '/health') return json({ status: 'ok', hell: 'cloud' });
   if (url.pathname === SESSION_PATH) return session(request, env, limiter);
   if (url.pathname.startsWith('/v1/')) {
     if (!(await authenticated(request, env))) return json({ detail: 'Sign in to HELL first' }, 401);
-    if (url.pathname === '/v1/hell/diagnostics' && request.method === 'GET') return json(await diagnostics());
-    // Routes for later phases (cloud AI, weather, vision, reminders) go here.
+    const { pathname } = url;
+    const get = request.method === 'GET';
+    if (pathname === '/v1/hell/diagnostics' && get) return json(await diagnostics(env, deps));
+    if (pathname === '/v1/chat/completions' && request.method === 'POST') return chatCompletions(request, env, deps);
+    if (pathname === '/v1/models' && get) return json(modelList(env));
+    if (pathname === '/v1/info' && get) return json({ engine: aiConfigured(env) ? 'cloud' : 'none', model: aiConfigured(env) ? CLOUD_MODEL : '', agent: null });
+    // Routes for later phases (weather, reminders) go here.
     return json({ detail: 'Not available in HELL cloud yet' }, 404);
   }
   return env.ASSETS.fetch(request);
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const origin = new URL(request.url).origin;
-    return handle(request, env, cacheLimiter(caches.default, origin));
+    return handle(request, env, cacheLimiter(caches.default, origin), { waitUntil: (p) => ctx.waitUntil(p) });
   },
 } satisfies ExportedHandler<Env>;

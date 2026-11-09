@@ -22,7 +22,16 @@ export async function* streamChat(
   });
 
   if (!response.ok) {
-    throw new Error(`Chat request failed: ${response.status}`);
+    // Show the server's plain-language reason (e.g. "daily budget used up")
+    // when it gives one, instead of a bare status code.
+    let detail = '';
+    try {
+      const b = await response.json();
+      detail = typeof b?.detail === 'string' ? b.detail : '';
+    } catch {
+      // Non-JSON error body.
+    }
+    throw new Error(detail || `Chat request failed: ${response.status}`);
   }
 
   const reader = response.body!.getReader();

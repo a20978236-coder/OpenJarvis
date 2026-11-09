@@ -60,11 +60,11 @@ describe('HELL Worker', () => {
   });
 
   it('every other /v1 route needs a valid session', async () => {
-    expect((await handle(req('/v1/models'), env(), memoryLimiter())).status).toBe(401);
+    expect((await handle(req('/v1/not-a-route'), env(), memoryLimiter())).status).toBe(401);
     const forged = `v1.${Math.floor(Date.now() / 1000) + 999}.abc.notasignature`;
-    expect((await handle(req('/v1/models', { cookie: `${COOKIE_NAME}=${forged}` }), env(), memoryLimiter())).status).toBe(401);
+    expect((await handle(req('/v1/not-a-route', { cookie: `${COOKIE_NAME}=${forged}` }), env(), memoryLimiter())).status).toBe(401);
     const good = await issueToken(SECRET);
-    expect((await handle(req('/v1/models', { cookie: `${COOKIE_NAME}=${good}` }), env(), memoryLimiter())).status).toBe(404);
+    expect((await handle(req('/v1/not-a-route', { cookie: `${COOKIE_NAME}=${good}` }), env(), memoryLimiter())).status).toBe(404);
   });
 
   it('tokens expire, and rotating the secret signs everyone out', async () => {

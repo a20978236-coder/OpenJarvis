@@ -91,6 +91,19 @@ describe('HELL cloud (no home server)', () => {
     expect(c.status).toBe('warn');
     expect(c.summary).toBe('Cloud AI not set up yet');
     expect(c.fixes.join(' ')).not.toMatch(/jarvis serve|ollama/);
+    expect(c.fixes.join(' ')).toMatch(/ANTHROPIC_API_KEY/);
+  });
+
+  it('reports Claude, its budget, and a rejected key', () => {
+    const ai = { engine: 'cloud', model: 'claude-opus-5-5', models: 1, latency_ms: 90, configured: true, budget: { limit_usd: 1, spent_today_usd: 0.12 } };
+    const ok = aiCheck({ serverReachable: true, latencyMs: 40, ai: { ...ai, healthy: true } });
+    expect(ok.status).toBe('ok');
+    expect(ok.details).toContain('Spent today: $0.12 of $1.00');
+    const bad = aiCheck({ serverReachable: true, latencyMs: 40, ai: { ...ai, healthy: false, error: 'Claude refused HELL’s API key.' } });
+    expect(bad.status).toBe('bad');
+    expect(bad.fixes.join(' ')).toMatch(/ANTHROPIC_API_KEY/);
+    const spent = aiCheck({ serverReachable: true, latencyMs: 40, ai: { ...ai, healthy: true, budget: { limit_usd: 1, spent_today_usd: 1 } } });
+    expect(spent.summary).toMatch(/budget/);
   });
 
   it('points to the iPhone speech setting, not server installs', () => {

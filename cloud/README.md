@@ -6,8 +6,8 @@ that:
 
 - serves the HELL iPhone app (the same dashboard, unchanged) over HTTPS;
 - asks for your passcode before anything private works;
-- will hold your cloud AI key (added in a later phase) so it is never in the
-  app or on the phone.
+- talks to Claude (Anthropic's AI) for you, holding your Anthropic key so it
+  is never in the app or on the phone.
 
 It uses Cloudflare's **free plan** (100,000 requests a day). Nothing here
 costs money.
@@ -87,6 +87,25 @@ HELL refuses every sign-in until you do this — it is never left open.
    big for the phone's memory, and HELL will say so next time.
 4. **Remove from phone** frees the space again.
 
+## 8. Turn on cloud AI (Claude)
+
+Claude is pay-per-use from Anthropic (not part of Cloudflare's free plan).
+HELL caps spending at **$1 a day** by default.
+
+1. Go to **console.anthropic.com**, sign up, and add credit under
+   **Billing** (you can also set a monthly limit there).
+2. **API Keys** → **Create Key** → copy it.
+3. In Cloudflare: **Workers & Pages** → **hell** → **Settings** →
+   **Variables and Secrets** → **Add** → type **Secret**, name
+   `ANTHROPIC_API_KEY`, paste the key → **Save**.
+4. In HELL, run **Diagnostics**: *AI service* should say **Connected to
+   Claude** and show today's spending.
+
+To change the daily cap, edit `DAILY_LIMIT_USD` in `cloud/wrangler.jsonc`
+and redeploy. HELL uses Claude Opus 5.5 at low effort for quick, low-cost
+replies; if Claude declines a request for safety reasons, Anthropic may
+answer with another Claude model instead (charged at that model's price).
+
 ## Good to know
 
 - **Signing out everywhere:** change `SESSION_SECRET` in Cloudflare. Every
@@ -95,9 +114,12 @@ HELL refuses every sign-in until you do this — it is never left open.
 - **Sign-in lasts** 30 days per device.
 - **Without the GitHub secrets** the workflow still tests HELL but skips the
   deploy (it says so in the log) — nothing breaks.
-- **What works in the cloud today:** the app, sign-in and the dashboard.
-  Chat, weather, vision and on-phone storage arrive in the next phases; until
-  then those screens say they are unavailable rather than pretending.
+- **What works in the cloud today:** the app, sign-in, the dashboard, chat,
+  camera questions (Vision) and the AI hologram builder (with your Anthropic
+  key), and the on-phone AI test. Weather and on-phone storage arrive next;
+  until then those screens say they are unavailable rather than pretending.
+- **Listening** uses the iPhone's own speech recognition (Apple may process
+  the audio). Turn it off in **Settings › Voice** if you prefer.
 
 ## For developers
 

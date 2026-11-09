@@ -58,13 +58,30 @@ export function internetCheck(p: { browserOnline: boolean; server: { ok: boolean
   return r('internet', t, 'warn', 'Your HELL server has no internet', [p.server.error ?? ''].filter(Boolean), ['HELL still works locally; weather and web tools need the server to reach the internet.', 'Check the server computer’s network or firewall.']);
 }
 
-export function aiCheck(p: { serverReachable: boolean; latencyMs: number | null; ai: { engine: string; model: string; healthy: boolean; models: number; latency_ms: number | null; error?: string; configured?: boolean } | null }): CheckResult {
+type CloudBudget = { limit_usd: number; spent_today_usd: number };
+const usd = (n: number) => `$${n.toFixed(2)}`;
+export function aiCheck(p: { serverReachable: boolean; latencyMs: number | null; ai: { engine: string; model: string; healthy: boolean; models: number; latency_ms: number | null; error?: string; configured?: boolean; budget?: CloudBudget } | null }): CheckResult {
   const t = 'AI service';
-  if (p.serverReachable && p.ai?.engine === 'cloud' && p.ai.configured === false) {
-    return r('ai', t, 'warn', 'Cloud AI not set up yet', p.latencyMs != null ? [`HELL cloud round trip ${p.latencyMs} ms`] : [], [
-      'HELL’s cloud AI (Claude) is the next update; its key will stay in Cloudflare, never on the phone.',
-      'Meanwhile, try AI Modules › On-phone AI · test.',
-    ]);
+  if (p.serverReachable && p.ai?.engine === 'cloud') {
+    const details = p.latencyMs != null ? [`HELL cloud round trip ${p.latencyMs} ms`] : [];
+    if (p.ai.configured === false) {
+      return r('ai', t, 'warn', 'Cloud AI not set up yet', details, [
+        'Add your Anthropic API key in Cloudflare as the secret ANTHROPIC_API_KEY (Workers & Pages › hell › Settings › Variables and Secrets). It stays there, never on the phone.',
+        'Meanwhile, try AI Modules › On-phone AI · test.',
+      ]);
+    }
+    details.push(`Model: ${p.ai.model}`);
+    const b = p.ai.budget;
+    if (b) details.push(`Spent today: ${usd(b.spent_today_usd)} of ${usd(b.limit_usd)}`);
+    if (!p.ai.healthy) {
+      return r('ai', t, 'bad', 'Claude isn’t answering', [...details, p.ai.error ?? ''].filter(Boolean), [
+        'Check ANTHROPIC_API_KEY in Cloudflare, and that your Anthropic account has credit.',
+      ]);
+    }
+    if (b && b.spent_today_usd >= b.limit_usd) {
+      return r('ai', t, 'warn', 'Today’s cloud AI budget is used up', details, ['It resets at midnight UTC. To raise it, change DAILY_LIMIT_USD in cloud/wrangler.jsonc.']);
+    }
+    return r('ai', t, 'ok', 'Connected to Claude', details);
   }
   if (!p.serverReachable) {
     return r('ai', t, 'bad', 'Can’t reach your HELL server', [], ['Make sure the computer running HELL is on and `jarvis serve` is running.', 'Check the iPhone is on the same network (or your VPN/tunnel is up).', 'Try opening the HELL address in Safari.']);

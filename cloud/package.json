@@ -24,5 +24,8 @@
   "allowScripts": {
     "esbuild": false,
     "workerd": false
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.6.0"
   }
 }
