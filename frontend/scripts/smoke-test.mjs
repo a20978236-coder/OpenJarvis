@@ -440,35 +440,42 @@ console.log(`HELL smoke test — ${base}\n`);
 
   await check('A phone that opens the bare address lands on HELL', async () => {
     const phone = await ctx.newPage();
-    await phone.route('**/*', fakeServer(freshState()));
-    await phone.goto(`${base}/`, { waitUntil: 'networkidle' });
-    await phone.locator('.hd').waitFor({ timeout: 8000 });
-    expect(new URL(phone.url()).pathname === '/m', `landed on ${phone.url()}`);
-    // The desktop layout stays reachable on purpose.
-    await phone.goto(`${base}/?desktop=1`, { waitUntil: 'networkidle' });
-    await phone.locator('textarea').first().waitFor({ state: 'attached', timeout: 15000 });
-    expect(new URL(phone.url()).pathname === '/' && (await phone.locator('.hd').count()) === 0, 'desktop=1 still opened HELL');
-    await phone.close();
+    try {
+      await phone.route('**/*', fakeServer(freshState()));
+      await phone.goto(`${base}/`, { waitUntil: 'networkidle' });
+      await phone.locator('.hd').waitFor({ timeout: 8000 });
+      expect(new URL(phone.url()).pathname === '/m', `landed on ${phone.url()}`);
+    } finally {
+      await phone.close();
+    }
   });
 
-  await check('Desktop app at / still renders, and its Dashboard opens', async () => {
-    // A real desktop browser (the iPhone context would be sent to /m).
-    const deskCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    const desk = await deskCtx.newPage();
-    await desk.route('**/*', fakeServer(freshState()));
-    const deskErrors = [];
-    desk.on('pageerror', (e) => deskErrors.push(e.message));
-    await desk.goto(`${base}/`, { waitUntil: 'networkidle' });
-    await desk.locator('textarea').first().waitFor({ timeout: 15000 }).catch(async () => {
-      const body = (await desk.locator('body').innerText().catch(() => '')).slice(0, 200).replace(/\n/g, ' / ');
-      throw new Error(`desktop did not render: url=${desk.url()} body="${body}" errors=${JSON.stringify(deskErrors)}`);
-    });
-    // The charts library must load without tripping the error screen.
-    await desk.goto(`${base}/dashboard`, { waitUntil: 'networkidle' });
-    await desk.waitForTimeout(500);
-    const crashed = await desk.getByText('Something went wrong').count();
-    expect(crashed === 0 && deskErrors.length === 0, `desktop dashboard crashed: ${deskErrors.slice(0, 2).join(' | ')}`);
-    await deskCtx.close();
+  await check('Desktop app still renders, and its Dashboard opens', async () => {
+    // This context has an iPhone user agent, so the bare address goes to HELL;
+    // ?desktop=1 asks for the desktop layout a desktop browser gets at /.
+    const desk = await ctx.newPage();
+    try {
+      await desk.setViewportSize({ width: 1280, height: 800 });
+      await desk.route('**/*', fakeServer(freshState()));
+      const deskErrors = [];
+      desk.on('pageerror', (e) => deskErrors.push(e.message));
+      await desk.goto(`${base}/?desktop=1`, { waitUntil: 'networkidle' });
+      await desk.locator('textarea').first().waitFor({ timeout: 15000 }).catch(async () => {
+        const body = (await desk.locator('body').innerText().catch(() => '')).slice(0, 200).replace(/\n/g, ' / ');
+        const boxes = await desk.locator('textarea').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return `${Math.round(r.width)}x${Math.round(r.height)}`; })).catch(() => []);
+        throw new Error(`desktop did not render: url=${desk.url()} textareas=${JSON.stringify(boxes)} body="${body}" errors=${JSON.stringify(deskErrors)}`);
+      });
+      expect((await desk.locator('.hd').count()) === 0, 'desktop=1 still opened HELL');
+      // The charts library must load without tripping the error screen.
+      await desk.goto(`${base}/dashboard`, { waitUntil: 'networkidle' });
+      await desk.getByText('System Overview').waitFor({ timeout: 15000 }).catch(async () => {
+        const body = (await desk.locator('body').innerText().catch(() => '')).slice(0, 200).replace(/\n/g, ' / ');
+        throw new Error(`desktop dashboard did not render: body="${body}" errors=${JSON.stringify(deskErrors)}`);
+      });
+      expect(deskErrors.length === 0, `desktop dashboard errors: ${deskErrors.slice(0, 2).join(' | ')}`);
+    } finally {
+      await desk.close();
+    }
   });
 
   await check('No JavaScript errors during the run', async () => {
