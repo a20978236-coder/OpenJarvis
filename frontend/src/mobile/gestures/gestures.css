@@ -123,7 +123,9 @@
 .cal-p { font-size: 14px; line-height: 1.5; color: var(--jm-text-2); display: flex; gap: 6px; align-items: flex-start; }
 .cal-p svg { flex: none; margin-top: 3px; color: var(--jm-cyan); }
 .cal-choices { display: flex; gap: 8px; }
-.cal-choices > button { flex: 1; min-height: 44px; }
+/* Three choices share a 390pt-wide card: keep the longest ("iPhone voice",
+   "HELL server") clear of the button edges. */
+.cal-choices > button { flex: 1; min-width: 0; min-height: 44px; padding: 0 6px; font-size: 14.5px; }
 .cal-wide { width: auto; padding: 0 14px; min-height: 44px; gap: 6px; }
 .cal-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .cal-knob { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
@@ -190,3 +192,8 @@
 .voice-inline { display: inline-flex; align-items: center; gap: 6px; }
 .set-h { margin-top: 10px; }
 .set-small { font-size: 12.5px; color: var(--jm-text-3); }
+/* A labelled group of choices in Settings, matching the sliders above it.
+   (Defined here because Settings loads this sheet; the look-alike
+   .holo-field lives in sheets that only load with other screens.) */
+.set-field { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+.set-field-label { font-size: 14.5px; font-weight: 600; }

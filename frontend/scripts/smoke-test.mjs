@@ -112,6 +112,8 @@ function fakeServer(state) {
       state.files = state.files.map((f) => ({ ...f, in_memory: true, memory_chunks: 1 }));
       return route.fulfill(json({ ...state.files[0], secrets_removed: 0 }));
     }
+    // Desktop Dashboard: enough usage for its cost panel to draw.
+    if (p === '/v1/savings') return route.fulfill(json({ total_calls: 3, total_prompt_tokens: 900, total_completion_tokens: 300, total_tokens: 1200, local_cost: 0.0004, per_provider: [], token_counting_version: 2 }));
     if (p === '/v1/agents') return route.fulfill(json({ registered: ['simple'], running: [] }));
     if (p === '/v1/skills') return route.fulfill(json({ skills: [] }));
     if (p === '/v1/chat/completions') {
@@ -436,9 +438,23 @@ console.log(`HELL smoke test — ${base}\n`);
     expect(unnamed === 0, `${unnamed} unnamed slider(s)`);
   });
 
-  await check('Desktop app at / still renders', async () => {
-    const desk = await ctx.newPage();
-    await desk.setViewportSize({ width: 1280, height: 800 });
+  await check('A phone that opens the bare address lands on HELL', async () => {
+    const phone = await ctx.newPage();
+    await phone.route('**/*', fakeServer(freshState()));
+    await phone.goto(`${base}/`, { waitUntil: 'networkidle' });
+    await phone.locator('.hd').waitFor({ timeout: 8000 });
+    expect(new URL(phone.url()).pathname === '/m', `landed on ${phone.url()}`);
+    // The desktop layout stays reachable on purpose.
+    await phone.goto(`${base}/?desktop=1`, { waitUntil: 'networkidle' });
+    await phone.locator('textarea').first().waitFor({ state: 'attached', timeout: 15000 });
+    expect(new URL(phone.url()).pathname === '/' && (await phone.locator('.hd').count()) === 0, 'desktop=1 still opened HELL');
+    await phone.close();
+  });
+
+  await check('Desktop app at / still renders, and its Dashboard opens', async () => {
+    // A real desktop browser (the iPhone context would be sent to /m).
+    const deskCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const desk = await deskCtx.newPage();
     await desk.route('**/*', fakeServer(freshState()));
     const deskErrors = [];
     desk.on('pageerror', (e) => deskErrors.push(e.message));
@@ -447,7 +463,12 @@ console.log(`HELL smoke test — ${base}\n`);
       const body = (await desk.locator('body').innerText().catch(() => '')).slice(0, 200).replace(/\n/g, ' / ');
       throw new Error(`desktop did not render: url=${desk.url()} body="${body}" errors=${JSON.stringify(deskErrors)}`);
     });
-    await desk.close();
+    // The charts library must load without tripping the error screen.
+    await desk.goto(`${base}/dashboard`, { waitUntil: 'networkidle' });
+    await desk.waitForTimeout(500);
+    const crashed = await desk.getByText('Something went wrong').count();
+    expect(crashed === 0 && deskErrors.length === 0, `desktop dashboard crashed: ${deskErrors.slice(0, 2).join(' | ')}`);
+    await deskCtx.close();
   });
 
   await check('No JavaScript errors during the run', async () => {

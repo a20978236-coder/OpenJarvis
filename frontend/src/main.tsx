@@ -5,9 +5,10 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import App from './App';
-import { initApiBase } from './lib/api';
+import { initApiBase, isTauri } from './lib/api';
 import { initAnalytics } from './lib/analytics';
 import { installAudioUnlock } from './lib/tts';
+import { phoneLanding } from './lib/phone-landing';
 import './index.css';
 
 // iPhone Safari blocks spoken replies unless audio was unlocked by a tap.
@@ -29,6 +30,13 @@ function applyTheme() {
 }
 
 applyTheme();
+
+// A phone that opens the bare address gets HELL, not the desktop layout.
+// Done before the router mounts, so nothing of the desktop page is drawn.
+if (!isTauri()) {
+  const landing = phoneLanding(window.location.pathname, window.location.search, navigator.userAgent);
+  if (landing) window.history.replaceState(null, '', landing);
+}
 
 // Fetch the API base URL from the Tauri backend before rendering.
 // This ensures JARVIS_PORT is defined in one place (the Rust backend).

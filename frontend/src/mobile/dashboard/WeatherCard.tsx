@@ -71,9 +71,9 @@ export function WeatherCard({ online, onOpenSetup }: { online: boolean | null; o
   if (source.kind === 'off') {
     body = (
       <>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <CloudSun size={22} aria-hidden="true" style={{ color: 'var(--jm-cyan)' }} />
-          <span style={{ fontSize: 13, fontWeight: 600 }}>Weather</span>
+        <span className="hd-weather-row">
+          <CloudSun size={20} aria-hidden="true" style={{ color: 'var(--jm-cyan)' }} />
+          <span className="hd-weather-name">Weather</span>
         </span>
         <span className="hd-weather-sub">Tap to set up</span>
       </>
@@ -82,8 +82,8 @@ export function WeatherCard({ online, onOpenSetup }: { online: boolean | null; o
     const Icon = !weather.is_day && weather.icon === 'clear' ? Moon : ICONS[weather.icon] ?? Cloud;
     body = (
       <>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Icon size={24} aria-hidden="true" style={{ color: '#ffd36b' }} />
+        <span className="hd-weather-row">
+          <Icon size={20} aria-hidden="true" style={{ color: '#ffd36b' }} />
           <span className="hd-weather-temp">
             {weather.temperature}°{weather.units.toUpperCase()}
           </span>

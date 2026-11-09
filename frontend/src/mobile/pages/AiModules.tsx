@@ -101,7 +101,7 @@ export function AiModules() {
       </Section>
 
       <Section icon={<Puzzle size={16} />} title="Skills">
-        <NameList load={skills} empty="No skills installed. Install them with `jarvis skill install` on the server." />
+        <NameList load={skills} empty="No skills installed. Install them with “jarvis skill install” on the server." />
       </Section>
     </div>
   );
