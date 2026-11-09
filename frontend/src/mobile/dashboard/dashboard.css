@@ -334,7 +334,9 @@
 .hd-dock {
   z-index: 2;
   display: grid;
-  grid-template-columns: 1.35fr 0.75fr auto 0.75fr 1fr;
+  /* The weather tile needs ~100pt on a 390pt-wide iPhone for "Weather" or
+     "-12°C" next to its icon; the hologram button gives up the difference. */
+  grid-template-columns: 1.5fr 0.75fr auto 0.75fr 0.85fr;
   align-items: center;
   gap: 6px;
   min-height: 84px;
@@ -353,11 +355,32 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  padding: 0 10px;
+  padding: 0 8px;
   width: 100%;
+  min-width: 0;
+}
+/* Icon + headline. The text may never run past the tile's cut corner. */
+.hd-weather-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+}
+.hd-weather-row svg { flex: none; }
+.hd-weather-name,
+.hd-weather-temp {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hd-weather-name {
+  font-size: 13px;
+  font-weight: 600;
 }
 .hd-weather-temp {
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }

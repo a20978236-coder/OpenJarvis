@@ -150,6 +150,13 @@
   overscroll-behavior: contain;
   padding: 4px 16px 20px;
 }
+/* Most screens lay this scroller out as a flex column. Rows must keep their
+   full height and scroll, never shrink: a row with an explicit min-height
+   (Settings rows, toggles) would otherwise be squeezed to that minimum and
+   its second line of text pushed out over the card's border. */
+.jm-scroll > * {
+  flex-shrink: 0;
+}
 
 .jm-tabbar {
   position: relative;

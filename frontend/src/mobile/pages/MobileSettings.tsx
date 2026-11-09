@@ -85,8 +85,8 @@ export function MobileSettings() {
           <input type="range" aria-label="Glow intensity" aria-valuetext={`${Math.round(ui.glow * 100)}%`} min={UI_LIMITS.glow[0]} max={UI_LIMITS.glow[1]} step={0.1} value={ui.glow} onChange={(e) => ui.update({ glow: Number(e.target.value) })} />
           <small>The blue glow around panels and buttons. The orb has its own glow under Orb.</small>
         </label>
-        <div className="holo-field">
-          <span id="set-anim">Animation intensity</span>
+        <div className="set-field">
+          <span id="set-anim" className="set-field-label">Animation intensity</span>
           <div role="radiogroup" aria-labelledby="set-anim" className="cal-choices">
             {(
               [

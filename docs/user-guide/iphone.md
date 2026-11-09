@@ -129,6 +129,10 @@ Restart `jarvis serve` after changing the config.
 
 The HELL icon now opens full screen, straight into the mobile app.
 
+A phone that opens the address without `/m` is sent to HELL too. To open the
+desktop layout on a phone on purpose, add `?desktop=1` to the bare address, or
+use **Settings → Full settings** inside HELL.
+
 The first time you tap the orb or the mic, iOS asks for microphone access.
 Tap **Allow**.
 

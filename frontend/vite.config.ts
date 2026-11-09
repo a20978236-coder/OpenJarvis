@@ -84,7 +84,13 @@ export default defineConfig({
               name: 'markdown',
               test: /node_modules[\\/](react-markdown|rehype-highlight|remark-gfm)[\\/]/,
             },
-            { name: 'charts', test: /node_modules[\\/]recharts[\\/]/ },
+            // No group for the charts library (recharts): with
+            // includeDependenciesRecursively off, its own dependencies stayed
+            // in the Dashboard page's chunk, the two chunks imported each
+            // other, and the desktop Dashboard crashed on open ("u is not a
+            // function"). Left alone, recharts and its helpers are bundled
+            // together with the lazy-loaded Dashboard page, which is the only
+            // screen that uses them, so the iPhone app still never downloads it.
             { name: 'router', test: /node_modules[\\/]react-router[\\/]/ },
           ],
         },
